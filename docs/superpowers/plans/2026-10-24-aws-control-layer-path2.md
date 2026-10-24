@@ -32,7 +32,7 @@ Failure modes the spec implies that no obvious task would test. Each has a test 
 - A stale or duplicate nudge for an idle mailbox does nothing and posts nothing (Task 5).
 - A wake-up further than 15 minutes away: the nudge is capped at 900 s and the next nudge re-arms (Task 5).
 - API Gateway delivers the body base64-encoded and header names in mixed case: the signature must still verify against the raw bytes (Task 7).
-- A mailbox item too large for DynamoDB: the webhook returns 503 so GitHub redelivers, instead of dropping the event (Task 3).
+- A mailbox item too large for DynamoDB: the webhook returns 503 instead of acknowledging an event it did not save (Task 3). GitHub does not redeliver failed webhooks by itself, so the event is lost unless it is redelivered by hand.
 
 ## File Structure
 
@@ -202,7 +202,7 @@ infra/aws/                         NEW workspace "slop-code-factory-aws"
   - `receiver returns 200 for a signed mention and queues one nudge`
   - `receiver verifies the signature when the body is base64 encoded and header names are mixed case` (Review Focus)
   - `receiver returns 401 or 403 for a bad signature and queues nothing`
-  - `receiver returns 503 when the table is unavailable` (so GitHub redelivers)
+  - `receiver returns 503 when the table is unavailable` (GitHub records the failure; it does not redeliver by itself)
   - `processor handles a nudge for an idle mailbox and returns no failures`
   - `SqsNudger rounds a 2500 ms delay up to DelaySeconds 3`
   - `sweepHandler nudges each due mailbox and reports the count`

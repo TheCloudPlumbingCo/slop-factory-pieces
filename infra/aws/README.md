@@ -85,7 +85,7 @@ For example: `aws logs tail /aws/lambda/slop-code-factory-dev-processor --follow
 
 - Every webhook becomes a state change in the mailbox item, with a dedup marker written in the same DynamoDB transaction, so a redelivery does nothing a second time.
 - When a mailbox has work due at `readyAt`, it is nudged: a message `{ mailboxKey }` on the SQS queue with a delay of `readyAt - now`, never negative and capped at 900 s (the SQS maximum). The queue is a standard queue, not FIFO, because FIFO has no per-message delay. A duplicate nudge is harmless: the engine's claim and lease make it a no-op.
-- The Processor takes one message per invocation (timeout 30 s), runs the mailbox passes, and nudges again if the mailbox is still due at some time. A failed record is reported back so SQS delivers it again; after 5 receives it goes to the dead-letter queue.
+- The Processor takes one message per invocation (timeout 30 s) and runs the mailbox passes while they find work: at most 20 passes, and no new pass once `PASS_BUDGET_MS` (15 s) has passed, so a burst of batches cannot run past the timeout in the middle of an echo. Then it re-reads the mailbox and nudges again: at `readyAt` if that is later; at once if the passes stopped at the cap or the budget with work left; after `REARM_FLOOR_MS` (5 s) if the mailbox is due but its last pass found no work (a claim or write that keeps failing, which the engine reports as a skipped mailbox), so a stuck mailbox is retried every few seconds instead of in a tight loop. A failed record is reported back so SQS delivers it again after the visibility timeout; after 5 receives it goes to the dead-letter queue.
 - A nudge capped at 900 s arrives before `readyAt` and finds nothing due. The sweep covers that case.
 - The sweep runs every minute, finds mailboxes whose `readyAt` has passed and nudges them. In the normal case it finds nothing.
 - The echo agent runs inside the Processor, waits 5 s, then replies. The delivery API routes are not exposed through API Gateway.
@@ -95,6 +95,10 @@ For example: `aws logs tail /aws/lambda/slop-code-factory-dev-processor --follow
 - Reply posting is at least once: GitHub comments have no idempotency key, so a retry after a crash between posting and recording can post twice.
 - A nudge for a mailbox due later than 15 minutes is late by up to about a minute (the sweep). The engine's longest wait today is 10 minutes.
 - The delivery API is not reachable over HTTP, so requirements 18 and 20 (hand-off over HTTP) are not exercised on AWS.
+- GitHub does not redeliver a failed webhook by itself. A 503 from the Receiver (table unavailable, or a mailbox item too large to write) means the event is lost unless someone redelivers it by hand from the App's "Recent deliveries".
+- Every Processor invocation in a nudge chain starts passes for at most `PASS_BUDGET_MS` (15 s), then hands the rest to a fresh invocation through a delay-0 nudge.
+- The Sweep Lambda builds the same runtime as the others, so it also needs valid SSM and GitHub configuration to cold start. Configuration is read once per cold start: a rotated secret takes effect only in new Lambda instances (force one, for example by updating the function configuration).
+- Terraform state is local only (no backend): it lives on the owner's machine and is gitignored.
 
 ## Unverified
 
@@ -106,6 +110,7 @@ Nothing here has run on AWS:
 - Duplicate-over-conflict precedence through `CancellationReasons` was shown only on DynamoDB Local.
 - A standalone `TransactionConflictException` from `TransactWriteItems` would map to an unavailable error; it was not seen.
 - Cold-start time is unmeasured.
+- The real size of a mailbox item after a full run is unmeasured. Waiting admissions carry the full webhook payload, and DynamoDB caps an item at 400 KB.
 - `GitHubApiLive` is untested against real GitHub from Lambda.
 
 ## Verified on AWS
