@@ -17,14 +17,21 @@ import {
 	GitHubIssueComment,
 	GitHubParticipant,
 } from '@humanlayer/channels-github'
-import { echoReply } from '@slop/core'
+import { AgentSessionMessage, AgentSessions, DeliveryApi, echoReply, targetOf } from '@slop/core'
 import { botMention, conformanceBot } from '@slop/core/conformance/driver'
 import type { APIGatewayProxyEventV2, SQSBatchResponse, SQSEvent } from 'aws-lambda'
-import { Clock, Config, ConfigProvider, Effect, Fiber, Layer, Ref } from 'effect'
+import { Clock, Config, ConfigProvider, Effect, Fiber, FiberSet, Layer, Ref, Schema, Scope } from 'effect'
 import { TestClock } from 'effect/testing'
 
 import { ssmConfigProvider } from '../src/Config'
-import { type HandlerDependencies, type Handlers, lambdaEntryPoints, makeHandlers } from '../src/Handlers'
+import {
+	type HandlerDependencies,
+	type Handlers,
+	lambdaEntryPoints,
+	makeHandlers,
+	PASS_BUDGET_MS,
+	REARM_FLOOR_MS,
+} from '../src/Handlers'
 import { emptyMailboxState, type MailboxState } from '../src/MailboxState'
 import { MailboxTable, TableUnavailable } from '../src/MailboxTable'
 import { MemoryMailboxTable } from '../src/MemoryMailboxTable'
@@ -87,21 +94,73 @@ const unavailableTable = Layer.succeed(
 	}),
 )
 
-/** Handlers over a fresh memory table (or `table`), a fresh fake queue and a fake GitHub. */
-const setup = (input: { readonly table?: Layer.Layer<MailboxTable> } = {}) =>
+/** A memory table whose writes fail with `TableUnavailable` while `failWrites` is set; reads still work. */
+const makeFlakyTable = Effect.gen(function* () {
+	const memory = yield* MemoryMailboxTable.make
+	const state = { failWrites: false }
+	const table = MailboxTable.of({
+		...memory,
+		write: (request) =>
+			state.failWrites ? Effect.fail(new TableUnavailable({ reason: 'test: writes failing' })) : memory.write(request),
+	})
+	return { table, state }
+})
+
+/**
+ * An agent that, for each handed-off delivery, waits `workMs` and then completes it through the delivery API with
+ * `'slow reply'`; `drain` waits for every such wait.
+ */
+const makeSlowAgent = (workMs: number) =>
 	Effect.gen(function* () {
-		const memory = yield* MemoryMailboxTable.make
+		const fibers = yield* FiberSet.make<void, never>().pipe(Scope.provide(yield* Scope.make()))
+		const layer = Layer.effect(
+			AgentSessions,
+			Effect.gen(function* () {
+				const api = yield* DeliveryApi
+				return AgentSessions.of({
+					getByName: () => ({
+						send: (input: typeof AgentSessionMessage.Encoded) =>
+							Effect.gen(function* () {
+								const message = yield* Schema.decodeEffect(AgentSessionMessage)(input).pipe(Effect.orDie)
+								yield* FiberSet.run(
+									fibers,
+									Effect.sleep(workMs).pipe(
+										Effect.andThen(api.complete({ ...targetOf(message), payload: { markdown: 'slow reply' } })),
+										Effect.ignore,
+									),
+								)
+							}),
+					}),
+				})
+			}),
+		)
+		return { layer, drain: FiberSet.awaitEmpty(fibers) }
+	})
+
+/** Handlers over a fresh flaky memory table (or `table`), a fresh fake queue and a fake GitHub. */
+const setup = (
+	input: {
+		readonly table?: Layer.Layer<MailboxTable>
+		readonly agentSessions?: HandlerDependencies<never>['agentSessions']
+	} = {},
+) =>
+	Effect.gen(function* () {
+		const flaky = yield* makeFlakyTable
 		const queue = makeFakeQueue()
 		const gitHub = yield* makeFakeGitHub
 		const dependencies: HandlerDependencies<never> = {
-			table: input.table ?? Layer.succeed(MailboxTable, memory),
+			table: input.table ?? Layer.succeed(MailboxTable, flaky.table),
 			nudger: queue.nudger,
 			config: Effect.succeed(config),
 			gitHubApi: gitHub.layer,
+			...(input.agentSessions === undefined ? {} : { agentSessions: input.agentSessions }),
 		}
 		const handlers: Handlers = yield* makeHandlers(dependencies)
-		return { handlers, table: memory, queue, comments: gitHub.comments }
+		return { handlers, table: flaky.table, tableState: flaky.state, queue, comments: gitHub.comments }
 	})
+
+/** Take every message due now off the queue without running anything. */
+const dropDue = (queue: ReturnType<typeof makeFakeQueue>) => queue.deliverDue(() => Effect.void)
 
 const mentionBody = (input: { readonly eventId: string; readonly number: number; readonly text: string }) => {
 	const author = { id: 1_001, login: 'maintainer-1', type: 'User' }
@@ -304,6 +363,48 @@ describe('processorHandler', () => {
 		}),
 	)
 
+	it.effect('processor re-nudges a stuck mailbox (due, but its pass found no work) after REARM_FLOOR_MS, not at once', () =>
+		Effect.gen(function* () {
+			const { handlers, tableState, queue } = yield* setup()
+			const received = yield* handlers.receiver(signedMention({ eventId: 'stuck-1', number: 60, text: 'hello' }))
+			expect(received.statusCode).toBe(200)
+			const mailboxKey = (yield* queue.pending)[0]!.mailboxKey
+			yield* dropDue(queue)
+			/** Every claim write now fails; the engine reports the mailbox as skipped, so the pass ends with no work. */
+			tableState.failWrites = true
+			const now = yield* Clock.currentTimeMillis
+			const response = yield* handlers.processor(nudgeEvent([mailboxKey]))
+			expect(response).toEqual({ batchItemFailures: [] })
+			const pending = yield* queue.pending
+			expect(pending.map((message) => message.deliverAt)).toEqual([now + REARM_FLOOR_MS])
+		}),
+	)
+
+	it.effect('processor stops starting passes after PASS_BUDGET_MS and queues a delay-0 nudge for the work left', () =>
+		Effect.gen(function* () {
+			const slow = yield* makeSlowAgent(PASS_BUDGET_MS + 1_000)
+			const { handlers, queue, comments } = yield* setup({ agentSessions: slow })
+			yield* handlers.receiver(signedMention({ eventId: 'budget-1', number: 61, text: 'take long' }))
+			const mailboxKey = (yield* queue.pending)[0]!.mailboxKey
+			/** Past the 3 s debounce, so the first pass claims; its drain then outlasts the budget. */
+			yield* TestClock.adjust(3_000)
+			yield* dropDue(queue)
+			const startedAt = yield* Clock.currentTimeMillis
+			const fiber = yield* handlers.processor(nudgeEvent([mailboxKey])).pipe(Effect.forkChild)
+			const response = yield* runToEnd(fiber, 60_000)
+			const endedAt = yield* Clock.currentTimeMillis
+			expect(response).toEqual({ batchItemFailures: [] })
+			expect(endedAt - startedAt).toBeGreaterThanOrEqual(PASS_BUDGET_MS)
+			/** The reply is due, but no pass started after the budget, so it is posted by the next invocation. */
+			expect(yield* comments).toEqual([])
+			/** The re-nudge is the invocation's last send: at once, since work remains. */
+			expect((yield* queue.pending).at(-1)).toEqual({ mailboxKey, deliverAt: endedAt })
+			yield* dropDue(queue)
+			yield* handlers.processor(nudgeEvent([mailboxKey]))
+			expect(yield* comments).toEqual(['slow reply'])
+		}),
+	)
+
 	it.effect('processor does not nudge when the mailbox has nothing pending', () =>
 		Effect.gen(function* () {
 			const { handlers, table, queue } = yield* setup()
@@ -399,6 +500,7 @@ describe('lambdaEntryPoints', () => {
 				receiver: () => Effect.succeed({ statusCode: 204 }),
 				processor: () => Effect.succeed({ batchItemFailures: [] }),
 				sweep: Effect.succeed({ nudged: 7 }),
+				processNudge: () => Effect.void,
 			}
 			const entryPoints = lambdaEntryPoints(
 				Effect.suspend(() => (++builds === 1 ? Effect.fail('ssm down') : Effect.succeed(stub))),

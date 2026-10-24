@@ -10,8 +10,10 @@
  *   client (reaches the delivery API routes in process), and in `'nudge'` mode the queue (`makeFakeQueue`).
  * - `'polling'`: one long-lived processing layer polls the whole table every 100 ms; nudges go nowhere.
  * - `'nudge'`: polling is disabled. Every stored write nudges the fake queue; `advance` delivers due messages, and
- *   each delivery is one Processor invocation: a fresh processing layer over a store scoped to that mailbox,
- *   running passes until one finds no work (at most 20), then discarded.
+ *   each delivery is one Processor invocation: the production `processNudge` from `makeHandlers` (passes over that
+ *   mailbox only, within the pass cap and time budget, then the re-nudge), with this driver's fake GitHub and its
+ *   recording `AgentSessions` (nothing to drain). A failed invocation is delivered again after the queue's
+ *   visibility timeout, as SQS does.
  * - The table and the queue are built once; `restart` drops all processing and builds it again over them.
  */
 import { createHmac } from 'node:crypto'
@@ -23,7 +25,6 @@ import {
 	DeliveryControlLive,
 	DeliveryTerminalConflict,
 	deliveryApiRoutes,
-	MailboxProcessing,
 	makeDeliveryClient,
 } from '@humanlayer/channels-delivery'
 import {
@@ -38,11 +39,12 @@ import {
 } from '@humanlayer/channels-github'
 import { type AgentSessionMessage, AgentSessions, botSettings, DeliveryApi, echoReply, makeGitHubProvider } from '@slop/core'
 import { type AgentStart, type ControlLayerDriver, conformanceBot } from '@slop/core/conformance/driver'
-import { Cause, Clock, ConfigProvider, Context, Effect, Exit, Layer, Redacted, Ref, Scope } from 'effect'
+import { Clock, ConfigProvider, Context, Effect, Exit, Layer, Redacted, Ref, Scope } from 'effect'
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpEffect, HttpRouter, HttpServerRequest } from 'effect/http'
 import { TestClock } from 'effect/testing'
 
 import { makeDynamoStorage, sweep } from '../../src/DynamoMailboxStore'
+import { type Handlers, makeHandlers } from '../../src/Handlers'
 import { MailboxTable } from '../../src/MailboxTable'
 import { Nudger } from '../../src/Nudger'
 import { makeFakeQueue } from './fake-queue'
@@ -53,8 +55,8 @@ const ORIGIN = 'http://control-layer.test'
 const POLL_MS = 100
 /** `advance` moves the clock in steps no longer than this, so work woken by one step can schedule the next. */
 const ADVANCE_STEP_MS = 100
-/** The most processing passes one nudge runs, as the Cloudflare mailbox alarm does. */
-const MAX_PASSES_PER_NUDGE = 20
+/** SQS hides a message whose invocation failed for this long before delivering it again (6 x the 30 s timeout). */
+const VISIBILITY_TIMEOUT_MS = 180_000
 /** Real event-loop turns with no table call in flight before background processing counts as settled. */
 const QUIET_TURNS = 3
 /** The most real event-loop turns one settle waits for table calls to finish. */
@@ -86,13 +88,12 @@ const botAuthor = GitHubParticipant.make({
 })
 
 /** What the GitHub provider reads from the environment. */
-const environment = ConfigProvider.layer(
-	ConfigProvider.fromUnknown({
-		GITHUB_WEBHOOK_SECRET: signingKey,
-		GITHUB_BOT_MENTION_NAME: conformanceBot.mentionName,
-		GITHUB_BOT_USER_ID: String(conformanceBot.userId),
-	}),
-)
+const configProvider = ConfigProvider.fromUnknown({
+	GITHUB_WEBHOOK_SECRET: signingKey,
+	GITHUB_BOT_MENTION_NAME: conformanceBot.mentionName,
+	GITHUB_BOT_USER_ID: String(conformanceBot.userId),
+})
+const environment = ConfigProvider.layer(configProvider)
 
 /** Signed the way GitHub signs: `sha256=` + hex HMAC-SHA256 of the raw body. */
 const sign = (key: string, body: string) => `sha256=${createHmac('sha256', key).update(body).digest('hex')}`
@@ -275,61 +276,69 @@ export const makeAwsDriver = (input: {
 		)(router.asHttpEffect())
 		const send = (request: Request) => Effect.promise(() => handle(request))
 
-		/** Mailbox processing over a fresh store; `scope` limits it to one mailbox, as one nudge's invocation is. */
-		const processingLayer = (polling: 'disabled' | { readonly intervalMs: number }, scope?: string) =>
+		/** `'polling'` mode's processing: one layer over the whole table, polling every `intervalMs`. */
+		const pollingLayer = (polling: { readonly intervalMs: number }) =>
 			Channels.processingLayer(options, polling).pipe(
-				Layer.provide(
-					makeDynamoStorage({ polling, ...(scope === undefined ? {} : { scope }) }).layer.pipe(
-						Layer.provide(tableAndNudger),
-					),
-				),
+				Layer.provide(makeDynamoStorage({ polling }).layer.pipe(Layer.provide(tableAndNudger))),
 				Layer.provide(services),
 			)
 
 		/**
 		 * Everything processing holds in memory lives in this scope; `restart` closes it. In `'polling'` mode it holds
-		 * the poll loop. In `'nudge'` mode each delivery's processing runs in a child scope, closed when it ends.
+		 * the poll loop. In `'nudge'` mode it holds the production handlers (a fresh cold start after each restart),
+		 * whose `processNudge` scopes each delivery's processing itself.
 		 */
 		const startProcessing = Effect.gen(function* () {
 			const scope = yield* Scope.make()
 			if (input.mode === 'polling') {
-				yield* Layer.buildWithScope(processingLayer({ intervalMs: POLL_MS }), scope).pipe(Effect.orDie)
+				yield* Layer.buildWithScope(pollingLayer({ intervalMs: POLL_MS }), scope).pipe(Effect.orDie)
+				return { scope, handlers: undefined }
 			}
-			return scope
+			const handlers: Handlers = yield* makeHandlers({
+				table: trackedTable,
+				nudger,
+				config: Effect.succeed(configProvider),
+				gitHubApi,
+				agentSessions: { layer: agentSessions, drain: Effect.void },
+			}).pipe(Scope.provide(scope), Effect.orDie)
+			return { scope, handlers }
 		})
 		const processing = yield* Ref.make(yield* startProcessing)
-		yield* Effect.addFinalizer(() => Ref.get(processing).pipe(Effect.flatMap((scope) => Scope.close(scope, Exit.void))))
+		yield* Effect.addFinalizer(() =>
+			Ref.get(processing).pipe(Effect.flatMap(({ scope }) => Scope.close(scope, Exit.void))),
+		)
 
-		/** One nudge delivered: processing for that mailbox only, passing while a pass finds work. */
+		/**
+		 * One nudge delivered: exactly what the Processor runs for one record. A failed run is logged and the message
+		 * comes back after the visibility timeout, as SQS redelivers a record reported in `batchItemFailures`.
+		 */
 		const runNudge = (mailboxKey: string) =>
 			Effect.gen(function* () {
-				const scope = yield* Scope.fork(yield* Ref.get(processing))
-				yield* Effect.gen(function* () {
-					const context = yield* Layer.buildWithScope(processingLayer('disabled', mailboxKey), scope)
-					const mailboxProcessing = Context.get(context, MailboxProcessing)
-					const pass = mailboxProcessing.processReady.pipe(
-						Effect.map(({ claimed, output }) => claimed > 0 || output > 0),
-						Effect.catchCauseIf(
-							(cause) => !Cause.hasInterruptsOnly(cause),
-							(cause) => Effect.logError('AWS nudge pass failed', cause).pipe(Effect.as(false)),
+				const { handlers } = yield* Ref.get(processing)
+				if (handlers === undefined) return yield* Effect.die(new Error('runNudge is only used in nudge mode'))
+				yield* handlers.processNudge(mailboxKey).pipe(
+					Effect.catchCause((cause) =>
+						Effect.logError('AWS nudge processing failed', cause).pipe(
+							Effect.andThen(queueNudger.nudge(mailboxKey, VISIBILITY_TIMEOUT_MS)),
 						),
-					)
-					for (let passes = 0; passes < MAX_PASSES_PER_NUDGE; passes++) {
-						if (!(yield* pass)) break
-					}
-				}).pipe(
-					Effect.catchCause((cause) => Effect.logError('AWS nudge processing failed', cause)),
-					Effect.ensuring(Scope.close(scope, Exit.void)),
+					),
 				)
 			})
 
-		/** Wait until no table call has been in flight for a few real event-loop turns. */
+		/** Wait until no table call has been in flight for a few real event-loop turns; die if that never happens. */
 		const settle = Effect.gen(function* () {
 			let quiet = 0
 			for (let turn = 0; turn < MAX_SETTLE_TURNS && quiet < QUIET_TURNS; turn++) {
 				yield* Effect.yieldNow
 				quiet = tableCallsInFlight === 0 ? quiet + 1 : 0
 				yield* realTurn
+			}
+			if (quiet < QUIET_TURNS) {
+				return yield* Effect.die(
+					new Error(
+						`aws-driver: table calls still in flight after ${MAX_SETTLE_TURNS} event-loop turns (${tableCallsInFlight} now)`,
+					),
+				)
 			}
 		})
 
@@ -449,7 +458,7 @@ export const makeAwsDriver = (input: {
 			setAuthorAccess: (login, access) =>
 				Ref.update(recorded, (current) => ({ ...current, access: new Map(current.access).set(login, access) })),
 			restart: Effect.gen(function* () {
-				yield* Scope.close(yield* Ref.get(processing), Exit.void)
+				yield* Scope.close((yield* Ref.get(processing)).scope, Exit.void)
 				yield* Ref.set(processing, yield* startProcessing)
 			}),
 			sweep: Clock.currentTimeMillis.pipe(

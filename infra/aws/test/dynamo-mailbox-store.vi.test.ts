@@ -197,6 +197,39 @@ describe('DynamoMailboxStore', () => {
 		}),
 	)
 
+	it.effect('deliver while a delivery is active leaves readyAt untouched', ({ expect }) =>
+		Effect.gen(function* () {
+			const table = yield* MemoryMailboxTable.make
+			const { nudger } = yield* recordingNudger
+			yield* withStore(
+				{ table, nudger },
+				Effect.gen(function* () {
+					yield* deliver(admission('e1'))
+					yield* MailboxProcessingBackend.use((backend) =>
+						backend.claimMailbox(
+							ClaimWaitingEvents.make({
+								mailboxKey: keyOf(),
+								upToSequence: 0,
+								leaseMs: 30_000,
+								batchId: BatchId.make('b1'),
+								accessToken: 'token',
+							}),
+						),
+					)
+				}),
+			)
+			const claimed = Option.getOrThrow(yield* table.read(keyOf())).state
+			expect(claimed.deliveries.active).not.toBeNull()
+
+			const receipt = yield* withStore({ table, nudger }, deliver(admission('e2')))
+
+			expect(receipt.accepted).toBe(true)
+			const after = Option.getOrThrow(yield* table.read(keyOf())).state
+			expect(after.waiting.map((entry) => entry.admission.eventId)).toEqual(['e2'])
+			expect(after.deliveries).toEqual(claimed.deliveries)
+		}),
+	)
+
 	it.effect('a nudger that fails does not fail the write', ({ expect }) =>
 		Effect.gen(function* () {
 			const table = yield* MemoryMailboxTable.make
