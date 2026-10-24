@@ -1,0 +1,21 @@
+{
+	"name": "slop-code-factory-aws",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "vitest --run",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"dependencies": {
+		"@humanlayer/channels-delivery": "0.1.0",
+		"@humanlayer/channels-github": "0.1.0",
+		"@humanlayer/channels-jira": "file:../../infra/cloudfare/vendor/humanlayer-channels-jira-0.0.0-85830e9.tgz",
+		"@slop/core": "*",
+		"effect": "4.0.0"
+	},
+	"devDependencies": {
+		"@effect/vitest": "4.0.0",
+		"typescript": "7.0.2",
+		"vitest": "5.0.1"
+	}
+}
