@@ -14,6 +14,7 @@ resource "aws_cloudwatch_log_group" "lambda" {
   retention_in_days = var.log_retention_days
 }
 
+# Each function waits for its own access policy (depends_on) so its first invocation cannot precede its permissions.
 resource "aws_lambda_function" "receiver" {
   function_name    = "${local.name}-receiver"
   role             = aws_iam_role.receiver.arn
@@ -29,7 +30,7 @@ resource "aws_lambda_function" "receiver" {
     variables = local.environment
   }
 
-  depends_on = [aws_cloudwatch_log_group.lambda, aws_iam_role_policy.logs]
+  depends_on = [aws_cloudwatch_log_group.lambda, aws_iam_role_policy.logs, aws_iam_role_policy.receiver]
 }
 
 resource "aws_lambda_function" "processor" {
@@ -47,7 +48,7 @@ resource "aws_lambda_function" "processor" {
     variables = local.environment
   }
 
-  depends_on = [aws_cloudwatch_log_group.lambda, aws_iam_role_policy.logs]
+  depends_on = [aws_cloudwatch_log_group.lambda, aws_iam_role_policy.logs, aws_iam_role_policy.processor]
 }
 
 resource "aws_lambda_function" "sweep" {
@@ -65,7 +66,7 @@ resource "aws_lambda_function" "sweep" {
     variables = local.environment
   }
 
-  depends_on = [aws_cloudwatch_log_group.lambda, aws_iam_role_policy.logs]
+  depends_on = [aws_cloudwatch_log_group.lambda, aws_iam_role_policy.logs, aws_iam_role_policy.sweep]
 }
 
 resource "aws_lambda_event_source_mapping" "processor" {
@@ -73,4 +74,7 @@ resource "aws_lambda_event_source_mapping" "processor" {
   function_name           = aws_lambda_function.processor.arn
   batch_size              = 1
   function_response_types = ["ReportBatchItemFailures"]
+
+  # AWS checks the role's SQS permissions when the mapping is created, so the policy must exist first.
+  depends_on = [aws_iam_role_policy.processor]
 }
