@@ -44,7 +44,7 @@ export const makeTestTable = Effect.fn('makeTestTable')(function* (endpointUrl: 
 								{ AttributeName: 'due', KeyType: 'HASH' },
 								{ AttributeName: 'dueAt', KeyType: 'RANGE' },
 							],
-							Projection: { ProjectionType: 'ALL' },
+							Projection: { ProjectionType: 'KEYS_ONLY' },
 						},
 					],
 				}),

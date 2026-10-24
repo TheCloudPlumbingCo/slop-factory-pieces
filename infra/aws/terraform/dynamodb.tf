@@ -1,5 +1,6 @@
 # Layout is documented in infra/aws/src/DynamoMailboxTable.ts: partition key `pk`; the sparse GSI `due-index`
-# holds only mailboxes waiting to be looked at; dedup items carry a `ttl` (epoch seconds).
+# holds only mailboxes waiting to be looked at, keys only (the sweep reads just `pk` from it); dedup items carry a
+# `ttl` (epoch seconds).
 resource "aws_dynamodb_table" "mailbox" {
   name         = local.name
   billing_mode = "PAY_PER_REQUEST"
@@ -22,7 +23,7 @@ resource "aws_dynamodb_table" "mailbox" {
 
   global_secondary_index {
     name            = "due-index"
-    projection_type = "ALL"
+    projection_type = "KEYS_ONLY"
 
     key_schema {
       attribute_name = "due"

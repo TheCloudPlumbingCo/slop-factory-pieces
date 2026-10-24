@@ -29,13 +29,13 @@ data "aws_iam_policy_document" "ssm_read" {
 data "aws_iam_policy_document" "mailbox_read_write" {
   statement {
     sid = "MailboxTable"
-    # Get/Put/Delete/Query are the commands DynamoMailboxTable sends; TransactWriteItems is the dedup + state write.
+    # DynamoMailboxTable sends Get/Put/Delete/Query and TransactWriteItems (the dedup marker + state write). IAM has
+    # no TransactWriteItems action: a transaction is authorised by the per-item actions it performs (PutItem here).
     actions = [
       "dynamodb:GetItem",
       "dynamodb:PutItem",
       "dynamodb:DeleteItem",
       "dynamodb:Query",
-      "dynamodb:TransactWriteItems",
     ]
     resources = [
       aws_dynamodb_table.mailbox.arn,

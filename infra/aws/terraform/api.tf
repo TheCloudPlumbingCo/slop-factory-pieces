@@ -22,6 +22,12 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.webhook.id
   name        = "$default"
   auto_deploy = true
+
+  # A cap on what anyone can make the Receiver (and the table) do. GitHub sends far less than this for one bot.
+  default_route_settings {
+    throttling_burst_limit = 50
+    throttling_rate_limit  = 25
+  }
 }
 
 resource "aws_lambda_permission" "api_invokes_receiver" {
@@ -29,5 +35,5 @@ resource "aws_lambda_permission" "api_invokes_receiver" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.receiver.function_name
   principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_apigatewayv2_api.webhook.execution_arn}/*/*"
+  source_arn    = "${aws_apigatewayv2_api.webhook.execution_arn}/*/POST/integrations/github/webhook"
 }

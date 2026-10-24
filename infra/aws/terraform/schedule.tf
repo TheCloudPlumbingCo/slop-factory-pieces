@@ -43,5 +43,11 @@ resource "aws_scheduler_schedule" "sweep" {
   target {
     arn      = aws_lambda_function.sweep.arn
     role_arn = aws_iam_role.scheduler.arn
+
+    # A missed sweep is not worth retrying: the next one runs a minute later.
+    retry_policy {
+      maximum_retry_attempts       = 0
+      maximum_event_age_in_seconds = 60
+    }
   }
 }
