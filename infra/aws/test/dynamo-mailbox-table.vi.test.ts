@@ -117,6 +117,33 @@ if (endpoint === undefined) {
 			),
 		)
 
+		it.effect('racing event-keyed and keyless writes: exactly one written, the rest conflict, never TableUnavailable', ({ expect }) =>
+			withTable((input) =>
+				Effect.gen(function* () {
+					const table = makeDynamoMailboxTable(input)
+					for (let round = 0; round < 10; round++) {
+						const first = emptyMailboxState({ mailboxKey: `m${round}`, provider: 'github' })
+						yield* table.write({ state: first, expectedVersion: null })
+						const outcomes = yield* Effect.all(
+							Array.from({ length: 10 }, (_, index) =>
+								table
+									.write({
+										state: { ...first, nextSequence: index + 1 },
+										expectedVersion: 1,
+										...(index % 2 === 0 ? { newEventKey: `e${round}-${index}` } : {}),
+									})
+									.pipe(Effect.result),
+							),
+							{ concurrency: 'unbounded' },
+						)
+						const values = outcomes.map((outcome) => (outcome._tag === 'Success' ? outcome.success : 'unavailable'))
+						expect(values.filter((value) => value === 'written')).toHaveLength(1)
+						expect(values.filter((value) => value === 'conflict')).toHaveLength(9)
+					}
+				}),
+			),
+		)
+
 		it.effect('an unreachable table fails with TableUnavailable', ({ expect }) =>
 			withTable((input) =>
 				Effect.gen(function* () {

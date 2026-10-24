@@ -98,7 +98,7 @@ export const makeDynamoMailboxTable = (input: DynamoMailboxTableInput): MailboxT
 		if (newEventKey === undefined) {
 			return yield* settle(
 				() => client.send(new PutCommand(statePut)),
-				(error) => (isConditionFailed(error) ? 'conflict' : undefined),
+				(error) => (isRetryableWriteFailure(error) ? 'conflict' : undefined),
 			)
 		}
 
@@ -159,7 +159,9 @@ export const makeDynamoMailboxTable = (input: DynamoMailboxTableInput): MailboxT
 	return MailboxTable.of({ read, write, due, subscribe, isSubscribed, unsubscribe })
 }
 
-const isConditionFailed = (error: unknown) => error instanceof Error && error.name === 'ConditionalCheckFailedException'
+/** A plain Put fails retryably when its condition fails or a running transaction is touching the same item. */
+export const isRetryableWriteFailure = (error: unknown) =>
+	error instanceof Error && (error.name === 'ConditionalCheckFailedException' || error.name === 'TransactionConflictException')
 
 /** Provides the DynamoDB-backed table as the `MailboxTable` service. */
 export const DynamoMailboxTableLive = (input: DynamoMailboxTableInput): Layer.Layer<MailboxTable> =>
