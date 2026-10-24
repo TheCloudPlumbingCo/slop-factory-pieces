@@ -7,6 +7,7 @@ export class TableUnavailable extends Schema.TaggedError<TableUnavailable>()('Ta
 	reason: Schema.String,
 }) {}
 
+/** 'conflict': the stored version was not the expected one. 'duplicate': the event key was already seen (wins over 'conflict'). */
 export type WriteOutcome = 'written' | 'conflict' | 'duplicate'
 
 /**

@@ -24,6 +24,7 @@ export const MailboxState = Schema.Struct({
 })
 export type MailboxState = typeof MailboxState.Type
 
+/** A mailbox with no waiting events and an empty delivery slot. */
 export const emptyMailboxState = (mailbox: { readonly mailboxKey: string; readonly provider: string }): MailboxState =>
 	MailboxState.make({
 		mailboxKey: mailbox.mailboxKey,

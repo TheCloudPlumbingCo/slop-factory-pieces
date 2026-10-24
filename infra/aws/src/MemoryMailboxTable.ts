@@ -52,6 +52,7 @@ const make: Effect.Effect<MailboxTable['Service']> = Effect.gen(function* () {
 	})
 })
 
+/** `make` builds a fresh empty table per call; `layer` provides one as the `MailboxTable` service. */
 export const MemoryMailboxTable = {
 	make,
 	layer: Layer.effect(MailboxTable, make),

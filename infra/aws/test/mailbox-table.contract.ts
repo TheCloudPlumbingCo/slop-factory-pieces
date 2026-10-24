@@ -75,19 +75,50 @@ export const defineMailboxTableContract = (name: string, make: Effect.Effect<Tab
 				),
 		)
 
-		it.effect("two concurrent writes with the same expectedVersion: exactly one 'written'", ({ expect }) =>
+		it.effect("a repeated event key returns 'duplicate' even when expectedVersion is stale, and stores nothing", ({ expect }) =>
+			run((table) =>
+				Effect.gen(function* () {
+					const first = emptyMailboxState({ mailboxKey: 'm1', provider: 'github' })
+					yield* table.write({ state: first, expectedVersion: null, newEventKey: 'e' })
+					yield* table.write({ state: { ...first, nextSequence: 1 }, expectedVersion: 1 })
+					const outcome = yield* table.write({
+						state: { ...first, nextSequence: 99 },
+						expectedVersion: 1,
+						newEventKey: 'e',
+					})
+					expect(outcome).toBe('duplicate')
+					const read = yield* table.read('m1')
+					expect(Option.map(read, (item) => [item.state.nextSequence, item.version])).toEqual(Option.some([1, 2]))
+				}),
+			),
+		)
+
+		it.effect("a conflicting write with a new event key stores no marker, so the key can be used by a later valid write", ({ expect }) =>
+			run((table) =>
+				Effect.gen(function* () {
+					const first = emptyMailboxState({ mailboxKey: 'm1', provider: 'github' })
+					yield* table.write({ state: first, expectedVersion: null })
+					const stale = yield* table.write({ state: { ...first, nextSequence: 1 }, expectedVersion: 7, newEventKey: 'e2' })
+					expect(stale).toBe('conflict')
+					const retry = yield* table.write({ state: { ...first, nextSequence: 1 }, expectedVersion: 1, newEventKey: 'e2' })
+					expect(retry).toBe('written')
+				}),
+			),
+		)
+
+		it.effect("ten concurrent writes with the same expectedVersion: exactly one 'written', nine 'conflict'", ({ expect }) =>
 			run((table) =>
 				Effect.gen(function* () {
 					const first = emptyMailboxState({ mailboxKey: 'm1', provider: 'github' })
 					yield* table.write({ state: first, expectedVersion: null })
 					const outcomes = yield* Effect.all(
-						[
-							table.write({ state: { ...first, nextSequence: 1 }, expectedVersion: 1 }),
-							table.write({ state: { ...first, nextSequence: 2 }, expectedVersion: 1 }),
-						],
+						Array.from({ length: 10 }, (_, index) =>
+							table.write({ state: { ...first, nextSequence: index + 1 }, expectedVersion: 1 }),
+						),
 						{ concurrency: 'unbounded' },
 					)
-					expect([...outcomes].sort()).toEqual(['conflict', 'written'])
+					expect(outcomes.filter((outcome) => outcome === 'written')).toHaveLength(1)
+					expect(outcomes.filter((outcome) => outcome === 'conflict')).toHaveLength(9)
 				}),
 			),
 		)
