@@ -17,8 +17,7 @@ import {
 } from '@humanlayer/channels-jira'
 import { Config, Effect, Option, Schema } from 'effect'
 
-import { type AgentSessions, decideJiraMention, type JiraMentionOptions } from '@slop/core'
-import { handOff } from './Handoff'
+import { type AgentSessions, decideJiraMention, handOff, type JiraMentionOptions } from '@slop/core'
 
 type HandlerError = DeliveryHandoffError
 type HandlerRequirements = JiraApi | AgentSessions

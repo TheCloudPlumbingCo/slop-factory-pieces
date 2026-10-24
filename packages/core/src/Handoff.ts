@@ -1,11 +1,12 @@
 /**
- * Cloudflare's hand-off: what a decided mention becomes on this cloud. The request is sent to the discussion's
+ * The hand-off: what a decided mention becomes on a cloud. The request is sent to the discussion's
  * AgentSession with the delivery to finish, then the SDK delivery is handed off so the agent can complete it.
  */
 import type { DeliveryContext, DeliveryHandoff, DeliveryHandoffError } from '@humanlayer/channels-delivery'
 import { Effect, Schema } from 'effect'
 
-import { AgentSessionMessage, AgentSessions, type MentionRequest } from '@slop/core'
+import { AgentSessionMessage, type MentionRequest } from './AgentSessionMessage'
+import { AgentSessions } from './Ports'
 
 /** Fail a lost agent's delivery soon, so it cannot hold back the discussion's mailbox for the default day. */
 const HANDOFF_FAIL_AFTER = '10 minutes'
