@@ -369,6 +369,20 @@ const makeServices = (scope: string | undefined) =>
 	})
 
 /**
+ * The safety net for lost nudges: nudge, with no delay, every mailbox whose `readyAt` is at or before `now`.
+ * Run periodically; a nudge for a mailbox with nothing to do finds no work and changes nothing.
+ *
+ * @returns how many mailboxes were nudged
+ */
+export const sweep = Effect.fn('delivery.aws.sweep')(function* (now: number) {
+	const table = yield* MailboxTable
+	const nudger = yield* Nudger
+	const keys = yield* table.due(now)
+	yield* Effect.forEach(keys, (key) => nudger.nudge(key, 0), { discard: true })
+	return keys.length
+})
+
+/**
  * The engine's store over `MailboxTable`, waking processing through `Nudger`.
  *
  * @param input.polling - how the engine wakes processing; AWS wakes it with nudges, so `'disabled'`
