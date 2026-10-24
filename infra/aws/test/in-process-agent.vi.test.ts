@@ -6,7 +6,7 @@ import {
 	type DeliveryClientTarget,
 } from '@humanlayer/channels-delivery'
 import { GitHubId, GitHubIssue, GitHubIssueRef } from '@humanlayer/channels-github'
-import { Effect, Exit, Fiber, Layer, Redacted, Ref, Schema } from 'effect'
+import { Effect, Exit, Fiber, Layer, Logger, Redacted, Ref, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 
 import { AgentSessionMessage, AgentSessions, DeliveryApi, MOCK_WORK_DURATION } from '@slop/core'
@@ -31,13 +31,14 @@ const message = AgentSessionMessage.make({
 const encoded = Schema.encodeSync(AgentSessionMessage)(message)
 
 /** A DeliveryApi whose n-th `complete` call fails with `failures[n]` when that entry is set, and succeeds otherwise. */
-const fakeDeliveryApi = (failures: ReadonlyArray<DeliveryClosed | undefined>) =>
+const fakeDeliveryApi = (failures: ReadonlyArray<DeliveryClosed | 'defect' | undefined>) =>
 	Effect.gen(function* () {
 		const calls = yield* Ref.make<ReadonlyArray<DeliveryClientTarget>>([])
 		const complete = (call: DeliveryClientTarget) =>
 			Effect.gen(function* () {
 				const before = yield* Ref.getAndUpdate(calls, (all) => [...all, call])
 				const failure = failures[before.length]
+				if (failure === 'defect') return yield* Effect.die(new Error('complete blew up'))
 				if (failure !== undefined) return yield* Effect.fail(failure)
 				return { _tag: 'DeliveryMutationReceipt', deliveryId: message.deliveryId, status: 'accepted' } as const
 			})
@@ -46,7 +47,14 @@ const fakeDeliveryApi = (failures: ReadonlyArray<DeliveryClosed | undefined>) =>
 		return { calls, api }
 	})
 
-const setup = (failures: ReadonlyArray<DeliveryClosed | undefined> = []) =>
+/** A logger that records the level of every log event, to tell an Error-level log (the `catchCause` path) from a Warning. */
+const captureLogLevels = Effect.gen(function* () {
+	const levels: Array<string> = []
+	const layer = Logger.layer([Logger.make((options) => void levels.push(options.logLevel))])
+	return { levels, layer }
+})
+
+const setup = (failures: ReadonlyArray<DeliveryClosed | 'defect' | undefined> = []) =>
 	Effect.gen(function* () {
 		const fake = yield* fakeDeliveryApi(failures)
 		const { layer, drain } = yield* makeInProcessAgentSessions
@@ -100,15 +108,35 @@ describe('makeInProcessAgentSessions', () => {
 
 	it.effect('a send for the same message twice completes the delivery once and ignores DeliveryClosed', () =>
 		Effect.gen(function* () {
-			// Both sends call `complete`: the first succeeds, the second gets DeliveryClosed and is treated as done.
-			const { calls, send, drain } = yield* setup([undefined, new DeliveryClosed()])
-			yield* send(encoded)
-			yield* TestClock.adjust('1 seconds')
-			yield* send(encoded)
-			const fiber = yield* drain.pipe(Effect.forkChild)
-			yield* TestClock.adjust('10 seconds')
-			yield* Fiber.join(fiber)
-			expect(yield* Ref.get(calls)).toHaveLength(2)
+			const { levels, layer } = yield* captureLogLevels
+			yield* Effect.gen(function* () {
+				// Both sends call `complete`: the first succeeds, the second gets DeliveryClosed and is treated as done.
+				const { calls, send, drain } = yield* setup([undefined, new DeliveryClosed()])
+				yield* send(encoded)
+				yield* TestClock.adjust('1 seconds')
+				yield* send(encoded)
+				const fiber = yield* drain.pipe(Effect.forkChild)
+				yield* TestClock.adjust('10 seconds')
+				yield* Fiber.join(fiber)
+				expect(yield* Ref.get(calls)).toHaveLength(2)
+			}).pipe(Effect.provide(layer))
+			// answer logs a Warning for the closed delivery; an Error would mean it reached the catchCause.
+			expect(levels).not.toContain('Error')
+		}),
+	)
+
+	it.effect('a complete that dies is logged and does not make drain fail', () =>
+		Effect.gen(function* () {
+			const { levels, layer } = yield* captureLogLevels
+			yield* Effect.gen(function* () {
+				const { calls, send, drain } = yield* setup(['defect'])
+				yield* send(encoded)
+				const fiber = yield* drain.pipe(Effect.forkChild)
+				yield* TestClock.adjust(MOCK_WORK_DURATION)
+				yield* Fiber.join(fiber)
+				expect(yield* Ref.get(calls)).toHaveLength(1)
+			}).pipe(Effect.provide(layer))
+			expect(levels).toContain('Error')
 		}),
 	)
 
