@@ -24,6 +24,29 @@ Set these in `.env` (never committed; see `.env.example` for the names). The Wor
 - `JIRA_CLOUD_ID` is the site's cloud id, a UUID: `curl -s https://<site>.atlassian.net/_edge/tenant_info` returns it as `cloudId`. Anything that is not a UUID is rejected at startup.
 - `JIRA_API_TOKEN` is the API token of the bot's Atlassian service account. Every Jira call goes to `https://api.atlassian.com/ex/jira/<cloudId>/rest/api/3/...` with `Authorization: Bearer <token>`; Basic auth and the bot's email are not used.
 
+## Deploying
+
+The stack is `alchemy.run.ts`; it deploys the Ingress Worker and its two Durable Objects (mailbox and AgentSession) to Cloudflare. Run every command below from `infra/cloudfare`.
+
+1. Install from the repo root: `bun install`.
+2. Create `.env` from `.env.example` and fill in every variable (see Configuration). Alchemy reads `.env` by default; `--env-file <path>` uses another file.
+3. Give Alchemy Cloudflare credentials, either way:
+   - Interactive: `bunx alchemy profile` and connect Cloudflare when asked.
+   - Non-interactive (CI): export `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
+4. Once per Cloudflare account, provision what the stack needs (the Cloudflare-hosted state store): `bunx alchemy cloudflare bootstrap`.
+5. Preview, then deploy:
+   ```sh
+   bun run alchemy:plan
+   bun run alchemy:deploy
+   ```
+   The stage defaults to `live_$USER`. Pick another with `ALCHEMY_STAGE` or `--stage <name>`, for example `bunx alchemy deploy --stage prod`. Each stage is a separate deployment.
+6. The deploy prints the Worker `url`. Point the providers at it:
+   - GitHub App: webhook URL `<url>/integrations/github/webhook`, secret = `GITHUB_WEBHOOK_SECRET`.
+   - Jira: system webhook `<url>/integrations/jira/webhook` (see Jira setup).
+7. Check it works: mention the bot on a GitHub issue or comment `@<bot> /research hi` on a Jira issue. Expect an acknowledgement, then an echo reply about 5 seconds later.
+
+To change configuration, edit `.env` and run `bun run alchemy:deploy` again. To follow logs, `bunx alchemy logs --tail`. These steps come from the Alchemy CLI and the package scripts; this README's author has not run a deploy from them.
+
 ## Jira setup
 
 1. Create an Atlassian service account for the bot, give it access to the Jira projects, and create an API token for it (`JIRA_API_TOKEN`). Comments are posted as this account.
