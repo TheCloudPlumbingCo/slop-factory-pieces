@@ -21,6 +21,39 @@ variable "app_client_id" {
   description = "Client ID of the slop-portal-poc app registration"
   type        = string
 }
+variable "github_auth_mode" {
+  description = "How the portal connects to GitHub: \"app\" (GitHub App) or \"oauth\" (OAuth App)."
+  type        = string
+  default     = "app"
+  validation {
+    condition     = contains(["app", "oauth"], var.github_auth_mode)
+    error_message = "github_auth_mode must be \"app\" or \"oauth\"."
+  }
+}
+variable "github_client_id" {
+  type    = string
+  default = ""
+}
+variable "github_client_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "atlassian_client_id" {
+  type    = string
+  default = ""
+}
+variable "atlassian_client_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
+variable "token_encryption_key" {
+  description = "Base64 32-byte key. Leave empty and Terraform generates one that stays the same between applies."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
 variable "image" {
   description = "PUBLIC portal image, e.g. ghcr.io/<you>/portal-poc:1. Empty = placeholder image for the first apply."
   type        = string
@@ -78,6 +111,25 @@ resource "azurerm_container_app" "portal" {
     identity_ids = [azurerm_user_assigned_identity.portal.id]
   }
 
+  secret {
+    name  = "token-encryption-key"
+    value = local.token_encryption_key
+  }
+  dynamic "secret" {
+    for_each = local.github_enabled ? [1] : []
+    content {
+      name  = "github-client-secret"
+      value = var.github_client_secret
+    }
+  }
+  dynamic "secret" {
+    for_each = local.atlassian_enabled ? [1] : []
+    content {
+      name  = "atlassian-client-secret"
+      value = var.atlassian_client_secret
+    }
+  }
+
   ingress {
     external_enabled = true
     target_port      = 3000
@@ -113,6 +165,42 @@ resource "azurerm_container_app" "portal" {
         value = local.app_url
       }
       env {
+        name  = "GITHUB_AUTH_MODE"
+        value = var.github_auth_mode
+      }
+      env {
+        name        = "TOKEN_ENCRYPTION_KEY"
+        secret_name = "token-encryption-key"
+      }
+      dynamic "env" {
+        for_each = local.github_enabled ? { GITHUB_CLIENT_ID = var.github_client_id } : {}
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = local.github_enabled ? [1] : []
+        content {
+          name        = "GITHUB_CLIENT_SECRET"
+          secret_name = "github-client-secret"
+        }
+      }
+      dynamic "env" {
+        for_each = local.atlassian_enabled ? { ATLASSIAN_CLIENT_ID = var.atlassian_client_id } : {}
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+      dynamic "env" {
+        for_each = local.atlassian_enabled ? [1] : []
+        content {
+          name        = "ATLASSIAN_CLIENT_SECRET"
+          secret_name = "atlassian-client-secret"
+        }
+      }
+      env {
         name  = "AUTH_TRUST_HOST"
         value = "true"
       }
@@ -122,6 +210,18 @@ resource "azurerm_container_app" "portal" {
       }
     }
   }
+}
+
+# Stable key for encrypting stored provider tokens when none is supplied.
+resource "random_id" "token_key" {
+  byte_length = 32
+}
+
+locals {
+  token_encryption_key = var.token_encryption_key != "" ? var.token_encryption_key : random_id.token_key.b64_std
+  # A provider's secret exists on the app only when both of its values were given.
+  github_enabled    = var.github_client_id != "" && var.github_client_secret != ""
+  atlassian_enabled = var.atlassian_client_id != "" && var.atlassian_client_secret != ""
 }
 
 resource "random_password" "auth_secret" {

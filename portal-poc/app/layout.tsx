@@ -3,7 +3,7 @@ import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from "next/font/
 import { auth, signIn, signOut } from "@/auth";
 import { Store } from "@/components/Store";
 import { Shell } from "@/components/Shell";
-import { liveProviders } from "@/lib/providers/config";
+import { githubInfo, liveProviders } from "@/lib/providers/config";
 
 const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display" });
 const body = Instrument_Sans({ subsets: ["latin"], variable: "--font-body" });
@@ -37,7 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang="en" className={fonts}>
       <body>
-        <Store live={liveProviders()}>
+        <Store live={liveProviders()} githubInfo={githubInfo()}>
           <Shell name={session.user?.name ?? "You"} email={session.user?.email ?? ""} signOut={doSignOut}>
             {children}
           </Shell>

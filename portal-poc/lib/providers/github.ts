@@ -1,22 +1,22 @@
 import { getJson } from "@/lib/upstream";
 import type { TokenRecord } from "@/lib/tokens";
 import type { ClientCreds } from "@/lib/providers/config";
+import type { GithubMode } from "@/lib/githubMode";
 
-// GitHub App user-to-server OAuth (web flow, PKCE S256).
+// Two ways in, chosen by GITHUB_AUTH_MODE (see lib/githubMode.ts):
+//  app:   GitHub App user-to-server OAuth (PKCE S256), expiring tokens, repos from the installations
+//  oauth: classic OAuth App, scope "read:user repo", tokens never expire, repos from /user/repos
 const API = "https://api.github.com";
 const GH_HEADERS = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
 
 export type Repo = { fullName: string; private: boolean };
 
-export function authorizeUrl(c: ClientCreds, redirectUri: string, state: string, challenge: string): string {
+export function authorizeUrl(c: ClientCreds, redirectUri: string, state: string, challenge: string, mode: GithubMode = "app"): string {
   const u = new URL("https://github.com/login/oauth/authorize");
-  u.search = new URLSearchParams({
-    client_id: c.clientId,
-    redirect_uri: redirectUri,
-    state,
-    code_challenge: challenge,
-    code_challenge_method: "S256",
-  }).toString();
+  const params: Record<string, string> = { client_id: c.clientId, redirect_uri: redirectUri, state };
+  if (mode === "oauth") params.scope = "read:user repo";
+  else Object.assign(params, { code_challenge: challenge, code_challenge_method: "S256" });
+  u.search = new URLSearchParams(params).toString();
   return u.toString();
 }
 
@@ -38,9 +38,22 @@ async function tokenRequest(params: Record<string, string>, now: number): Promis
   };
 }
 
-export const exchangeCode = (c: ClientCreds, code: string, redirectUri: string, verifier: string, now = Date.now()) =>
+export const exchangeCode = (
+  c: ClientCreds,
+  code: string,
+  redirectUri: string,
+  verifier: string,
+  mode: GithubMode = "app",
+  now = Date.now(),
+) =>
   tokenRequest(
-    { client_id: c.clientId, client_secret: c.clientSecret, code, redirect_uri: redirectUri, code_verifier: verifier },
+    {
+      client_id: c.clientId,
+      client_secret: c.clientSecret,
+      code,
+      redirect_uri: redirectUri,
+      ...(mode === "app" ? { code_verifier: verifier } : {}),
+    },
     now,
   );
 
@@ -68,8 +81,21 @@ async function pages<T>(url: string, token: string, pick: (body: any) => T[]): P
   }
 }
 
-// A GitHub App user token reaches the repos of the installations the user can access.
-export async function listRepos(token: string): Promise<Repo[]> {
+const sorted = (repos: Repo[]) => repos.sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+// OAuth App token with the `repo` scope: every repo the user can access.
+async function listUserRepos(token: string): Promise<Repo[]> {
+  const rs = await pages<{ full_name: string; private: boolean }>(
+    `${API}/user/repos?affiliation=owner,collaborator,organization_member&sort=full_name`,
+    token,
+    (b) => b,
+  );
+  return sorted(rs.map((r) => ({ fullName: r.full_name, private: r.private })));
+}
+
+export async function listRepos(token: string, mode: GithubMode = "app"): Promise<Repo[]> {
+  if (mode === "oauth") return listUserRepos(token);
+  // A GitHub App user token reaches the repos of the installations the user can access.
   const installs = await pages<{ id: number }>(`${API}/user/installations`, token, (b) => b.installations);
   const repos: Repo[] = [];
   for (const i of installs) {
@@ -80,5 +106,5 @@ export async function listRepos(token: string): Promise<Repo[]> {
     );
     repos.push(...rs.map((r) => ({ fullName: r.full_name, private: r.private })));
   }
-  return repos.sort((a, b) => a.fullName.localeCompare(b.fullName));
+  return sorted(repos);
 }

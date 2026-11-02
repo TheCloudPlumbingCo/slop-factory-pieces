@@ -11,6 +11,7 @@ export type TokenRecord = {
   refreshToken?: string;
   expiresAt?: number; // ms epoch; absent = does not expire
   account: string; // label shown in the UI, e.g. "@alice-dev"
+  mode?: string; // GitHub only: the GITHUB_AUTH_MODE this connection was made under
 };
 
 // Swap the implementation (e.g. Cosmos) without touching callers.

@@ -68,3 +68,26 @@ developer.atlassian.com/console/myapps > Create > OAuth 2.0 integration.
 - Disconnect deletes the stored tokens but does not revoke them at GitHub or Atlassian.
 - Jira uses the first site returned by `accessible-resources`.
 - Token refresh is not locked across instances; with several replicas two refreshes can race (Atlassian rotates refresh tokens, so one user may have to reconnect).
+
+
+## GitHub mode flag: `GITHUB_AUTH_MODE`
+
+One deployment uses one GitHub mode, so you can deploy each and compare. Switch by changing the flag and the client ID/secret, then redeploy. Connections made under the other mode stop working and the user reconnects in Settings.
+
+| | `app` (default) | `oauth` |
+|---|---|---|
+| What you register | A GitHub App | A GitHub OAuth App |
+| Repos the portal can list | Only repos where the App is installed | Every repo the user can access, private included |
+| Scope asked | App permissions (Metadata and Contents, read) | `read:user repo` |
+| Token lifetime | Expires (8 hours by default) and refreshes | Does not expire |
+| Repo listing call | `/user/installations/{id}/repositories` | `/user/repos` |
+| PKCE sent | Yes | No (not verified for OAuth Apps) |
+
+### Register a GitHub OAuth App (for `GITHUB_AUTH_MODE=oauth`)
+
+1. GitHub, Settings, Developer settings, OAuth Apps, New OAuth App.
+2. Authorization callback URL: `<deployed URL>/api/connect/github/callback`.
+3. Generate a client secret. Put the client ID and secret in `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`.
+4. Set `GITHUB_AUTH_MODE=oauth`.
+
+These registration steps are from memory, not checked against the current GitHub docs. An organisation that restricts third-party OAuth apps will hide its repos until an owner approves the app.

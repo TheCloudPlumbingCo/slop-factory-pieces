@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Provider } from "@/lib/tokens";
+import type { GithubInfo } from "@/lib/githubMode";
 import { Connection, Task, Workspace, seedTasks, seedWorkspaces } from "@/lib/mock";
 
 type State = {
@@ -12,6 +13,7 @@ type State = {
 
 type Api = State & {
   ready: boolean;
+  githubInfo: GithubInfo;
   live: Record<Provider, boolean>; // true = real connection, false = simulated sample data
   startResearch: (key: string, title: string, workspace: string) => void;
   approve: (id: string) => void;
@@ -36,7 +38,7 @@ const initial = (): State => ({
 
 type ConnectionsResponse = Record<Provider, { connected: boolean; account?: string }>;
 
-export function Store({ children, live }: { children: React.ReactNode; live: Record<Provider, boolean> }) {
+export function Store({ children, live, githubInfo }: { children: React.ReactNode; live: Record<Provider, boolean>; githubInfo: GithubInfo }) {
   const [state, setState] = useState<State>(initial);
   const [ready, setReady] = useState(false);
 
@@ -127,8 +129,8 @@ export function Store({ children, live }: { children: React.ReactNode; live: Rec
   const reset = useCallback(() => setState(initial()), []);
 
   const api = useMemo<Api>(
-    () => ({ ...state, ready, live, startResearch, approve, stop, connect, disconnect, addWorkspace, removeWorkspace, reset }),
-    [state, ready, live, startResearch, approve, stop, connect, disconnect, addWorkspace, removeWorkspace, reset],
+    () => ({ ...state, ready, live, githubInfo, startResearch, approve, stop, connect, disconnect, addWorkspace, removeWorkspace, reset }),
+    [state, ready, live, githubInfo, startResearch, approve, stop, connect, disconnect, addWorkspace, removeWorkspace, reset],
   );
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

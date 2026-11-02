@@ -11,7 +11,7 @@ const sampleRepos: Repo[] = githubRepos.map((fullName) => ({ fullName, private: 
 export function RepoPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const { live } = useStore();
+  const { live, githubInfo } = useStore();
   const remote = useFetchList<Repo>(live.github ? "/api/github/repos" : null);
   const all = live.github ? remote.items : sampleRepos;
   const shown = useMemo(() => all.filter((r) => r.fullName.toLowerCase().includes(q.toLowerCase())), [all, q]);
@@ -34,12 +34,12 @@ export function RepoPicker({ value, onChange }: { value: string[]; onChange: (v:
       )}
       {open && (
         <div className="picker" role="dialog" aria-label="Choose repos">
-          <input autoFocus placeholder="Search your GitHub repos" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input autoFocus placeholder={`Search repos (${githubInfo.label})`} value={q} onChange={(e) => setQ(e.target.value)} />
           <ul>
             {live.github && remote.loading && <li className="none">Loading your repos…</li>}
             {remote.error && <li className="none">{errorHelp(remote.error, "GitHub")} <Link href="/settings">Settings</Link></li>}
             {!remote.loading && !remote.error && all.length === 0 && (
-              <li className="none">No repos found. Install the GitHub App on the organisations or repos you want to use, then reload.</li>
+              <li className="none">{githubInfo.mode === "oauth" ? "No repos found for this GitHub account." : "No repos found. Install the GitHub App on the organisations or repos you want to use, then reload."}</li>
             )}
             {!remote.loading && !remote.error && all.length > 0 && shown.length === 0 && <li className="none">No repos match “{q}”.</li>}
             {shown.map((r) => (

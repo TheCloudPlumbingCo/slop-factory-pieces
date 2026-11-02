@@ -12,7 +12,7 @@ const connectErrorText = (code: string): string =>
   })[code] ?? `Could not connect (${code}). Click Connect to try again.`;
 
 export default function Settings() {
-  const { jira, github, connect, disconnect, workspaces, addWorkspace, removeWorkspace, reset } = useStore();
+  const { jira, github, githubInfo, connect, disconnect, workspaces, addWorkspace, removeWorkspace, reset } = useStore();
   const [name, setName] = useState("");
   const [repos, setRepos] = useState<string[]>([]);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
@@ -36,7 +36,7 @@ export default function Settings() {
   };
 
   const providers = [
-    { id: "github" as const, name: "GitHub", state: github, why: "Lets the agent read your repos with your own access." },
+    { id: "github" as const, name: githubInfo.label, state: github, why: githubInfo.sees },
     { id: "jira" as const, name: "Jira", state: jira, why: "Lets you pick tasks from the issues you can see." },
   ];
 
@@ -56,6 +56,7 @@ export default function Settings() {
               <div>
                 <strong>{p.name}</strong>
                 <div className="muted">{p.state.connected ? `Connected as ${p.state.account}` : p.why}</div>
+                {p.state.connected && p.id === "github" && <div className="muted">{p.why}</div>}
               </div>
               {p.state.connected ? (
                 <button className="btn ghost" onClick={() => disconnect(p.id)}>Disconnect {p.name}</button>

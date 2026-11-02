@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { parseProvider, settingsRedirect } from "@/lib/connect-route";
 import { StateError, completeAuthorization, stateCookieName } from "@/lib/oauth-state";
 import { clientCreds, isLive, publicOrigin } from "@/lib/providers/config";
+import { githubMode } from "@/lib/githubMode";
 import * as github from "@/lib/providers/github";
 import * as jira from "@/lib/providers/jira";
 import { callerOid } from "@/lib/session";
@@ -36,10 +37,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
 
     const redirectUri = `${origin}/api/connect/${provider}/callback`;
     const tokens = provider === "github"
-      ? await github.exchangeCode(creds, code, redirectUri, verifier)
+      ? await github.exchangeCode(creds, code, redirectUri, verifier, githubMode() ?? "app")
       : await jira.exchangeCode(creds, code, redirectUri);
     const account = await (provider === "github" ? github.fetchAccount : jira.fetchAccount)(tokens.accessToken);
-    await getTokenStore().put(oid, provider, { ...tokens, account });
+    await getTokenStore().put(oid, provider, { ...tokens, account, ...(provider === "github" ? { mode: githubMode() ?? "app" } : {}) });
     return finish("connected", provider);
   } catch (e) {
     if (e instanceof StateError) return finish("error", e.message);

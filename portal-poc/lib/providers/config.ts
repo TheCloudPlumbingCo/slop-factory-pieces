@@ -1,5 +1,6 @@
 import { hasEncryptionKey } from "@/lib/crypto";
 import type { Provider } from "@/lib/tokens";
+import { githubMode, githubModeInfo, type GithubInfo } from "@/lib/githubMode";
 
 export type ClientCreds = { clientId: string; clientSecret: string };
 
@@ -14,7 +15,13 @@ export function clientCreds(p: Provider): ClientCreds | null {
 }
 
 // Real connections need: not the no-auth preview, provider credentials, and the encryption key.
+let warnedBadMode = false;
 export function isLive(p: Provider): boolean {
+  if (p === "github" && githubMode() === null) {
+    if (!warnedBadMode) console.error(`GITHUB_AUTH_MODE="${process.env.GITHUB_AUTH_MODE}" is invalid; use "app" or "oauth". GitHub is disabled.`);
+    warnedBadMode = true;
+    return false;
+  }
   return !process.env.PROTOTYPE_NO_AUTH && clientCreds(p) !== null && hasEncryptionKey();
 }
 
@@ -26,4 +33,12 @@ export function publicOrigin(req: Request): string {
   const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
   const proto = req.headers.get("x-forwarded-proto") ?? new URL(req.url).protocol.replace(":", "");
   return host ? `${proto}://${host}` : new URL(req.url).origin;
+}
+
+// What the UI shows about the GitHub connection (server-computed, safe for the client).
+export function githubInfo(): GithubInfo {
+  const mode = githubMode();
+  if (mode === null) return { mode, label: "GitHub", sees: 'GITHUB_AUTH_MODE is invalid. Set it to "app" or "oauth".' };
+  if (!isLive("github")) return { mode, label: `GitHub (${githubModeInfo[mode].label}, sample data)`, sees: "Sample data. Real GitHub is not configured on this deployment." };
+  return { mode, ...githubModeInfo[mode] };
 }

@@ -28,6 +28,17 @@ for arg in "$@"; do
   esac
 done
 
+# Pass the provider settings in .env.local to Terraform (they become Container App env vars/secrets).
+# Read one KEY=value line at a time; the file is never sourced, so nothing in it can run as code.
+envval() { grep -m1 "^$1=" .env.local 2>/dev/null | cut -d= -f2- || true; }
+export TF_VAR_github_auth_mode="${TF_VAR_github_auth_mode:-$(envval GITHUB_AUTH_MODE)}"
+export TF_VAR_github_client_id="${TF_VAR_github_client_id:-$(envval GITHUB_CLIENT_ID)}"
+export TF_VAR_github_client_secret="${TF_VAR_github_client_secret:-$(envval GITHUB_CLIENT_SECRET)}"
+export TF_VAR_atlassian_client_id="${TF_VAR_atlassian_client_id:-$(envval ATLASSIAN_CLIENT_ID)}"
+export TF_VAR_atlassian_client_secret="${TF_VAR_atlassian_client_secret:-$(envval ATLASSIAN_CLIENT_SECRET)}"
+export TF_VAR_token_encryption_key="${TF_VAR_token_encryption_key:-$(envval TOKEN_ENCRYPTION_KEY)}"
+[ -n "$TF_VAR_github_auth_mode" ] || unset TF_VAR_github_auth_mode   # blank falls back to the Terraform default
+
 [ -n "$APP_CLIENT_ID" ] || { echo "APP_CLIENT_ID is not set and .env.local has no AUTH_MICROSOFT_ENTRA_ID_ID" >&2; exit 1; }
 
 echo "==> Building $IMAGE (linux/amd64, Container Apps does not run arm64 here)"
