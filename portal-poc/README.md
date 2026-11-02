@@ -52,7 +52,7 @@ developer.atlassian.com/console/myapps > Create > OAuth 2.0 integration.
 - Authorization > OAuth 2.0 (3LO) > Callback URL (the console may accept only one URL; if so, register one app per environment):
   - `http://localhost:3000/api/connect/jira/callback`
   - `https://portal-poc.victoriousrock-79df929a.southeastasia.azurecontainerapps.io/api/connect/jira/callback`
-- Permissions > add Jira API, then configure scopes: `read:jira-work` and `read:me`. `offline_access` is requested at sign-in and gives the refresh token.
+- Permissions > add Jira API, then configure the granular scopes `read:issue-details:jira`, `read:audit-log:jira`, `read:avatar:jira`, `read:field-configuration:jira`, `read:issue-meta:jira` (what Atlassian's API spec lists for issue search, state Beta) plus `read:me` under the User identity API. The classic `read:jira-work` also works if your console offers it; then set `ATLASSIAN_SCOPES="read:jira-work read:me offline_access"`. `offline_access` is requested at sign-in and gives the refresh token.
 - Settings > copy Client ID and Secret into `ATLASSIAN_CLIENT_ID` / `ATLASSIAN_CLIENT_SECRET`.
 - Distribution: set to Sharing before people outside your own account can connect.
 

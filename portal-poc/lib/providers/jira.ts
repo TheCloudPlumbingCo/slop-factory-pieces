@@ -3,7 +3,13 @@ import type { TokenRecord } from "@/lib/tokens";
 import type { ClientCreds } from "@/lib/providers/config";
 
 // Atlassian OAuth 2.0 (3LO) + Jira Cloud REST v3 through the api.atlassian.com gateway.
-export const SCOPES = "read:jira-work read:me offline_access";
+// Read-only scopes for GET /rest/api/3/search/jql, read from Atlassian's published Jira API spec
+// (swagger-v3.v3.json, x-atlassian-oauth2-scopes): classic `read:jira-work`, or this granular set (state: Beta),
+// all of which the app must have. `read:me` is for GET /me. Asking for a scope the app lacks makes Atlassian answer 400.
+// Override with ATLASSIAN_SCOPES (space-separated) without a code change.
+export const DEFAULT_SCOPES =
+  "read:issue-details:jira read:audit-log:jira read:avatar:jira read:field-configuration:jira read:issue-meta:jira read:me offline_access";
+export const scopes = () => (process.env.ATLASSIAN_SCOPES?.trim() || DEFAULT_SCOPES);
 const GATEWAY = "https://api.atlassian.com";
 
 export type Issue = { key: string; title: string; url: string };
@@ -14,7 +20,7 @@ export function authorizeUrl(c: ClientCreds, redirectUri: string, state: string)
   u.search = new URLSearchParams({
     audience: "api.atlassian.com",
     client_id: c.clientId,
-    scope: SCOPES,
+    scope: scopes(),
     redirect_uri: redirectUri,
     state,
     response_type: "code",
@@ -71,7 +77,8 @@ export async function fetchAccount(token: string): Promise<string> {
 export function buildJql(q: string): string {
   const term = q.replace(/[^\p{L}\p{N}\s_-]/gu, " ").replace(/\s+/g, " ").trim();
   const order = "ORDER BY updated DESC";
-  if (!term) return order;
+  // The search endpoint rejects unbounded queries (ORDER BY alone), so an empty search is limited to recent issues.
+  if (!term) return `updated >= -90d ${order}`;
   const clauses = [`summary ~ "${term}*"`];
   if (/^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(term)) clauses.push(`key = "${term.toUpperCase()}"`);
   return `(${clauses.join(" OR ")}) ${order}`;

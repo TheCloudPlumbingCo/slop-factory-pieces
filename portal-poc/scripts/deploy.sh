@@ -36,6 +36,7 @@ export TF_VAR_github_client_id="${TF_VAR_github_client_id:-$(envval GITHUB_CLIEN
 export TF_VAR_github_client_secret="${TF_VAR_github_client_secret:-$(envval GITHUB_CLIENT_SECRET)}"
 export TF_VAR_atlassian_client_id="${TF_VAR_atlassian_client_id:-$(envval ATLASSIAN_CLIENT_ID)}"
 export TF_VAR_atlassian_client_secret="${TF_VAR_atlassian_client_secret:-$(envval ATLASSIAN_CLIENT_SECRET)}"
+export TF_VAR_atlassian_scopes="${TF_VAR_atlassian_scopes:-$(envval ATLASSIAN_SCOPES)}"
 export TF_VAR_token_encryption_key="${TF_VAR_token_encryption_key:-$(envval TOKEN_ENCRYPTION_KEY)}"
 [ -n "$TF_VAR_github_auth_mode" ] || unset TF_VAR_github_auth_mode   # blank falls back to the Terraform default
 

@@ -48,6 +48,11 @@ variable "atlassian_client_secret" {
   default   = ""
   sensitive = true
 }
+variable "atlassian_scopes" {
+  description = "Space-separated Jira scopes. Empty uses the portal's read-only defaults."
+  type        = string
+  default     = ""
+}
 variable "token_encryption_key" {
   description = "Base64 32-byte key. Leave empty and Terraform generates one that stays the same between applies."
   type        = string
@@ -198,6 +203,13 @@ resource "azurerm_container_app" "portal" {
         content {
           name        = "ATLASSIAN_CLIENT_SECRET"
           secret_name = "atlassian-client-secret"
+        }
+      }
+      dynamic "env" {
+        for_each = var.atlassian_scopes != "" ? [1] : []
+        content {
+          name  = "ATLASSIAN_SCOPES"
+          value = var.atlassian_scopes
         }
       }
       env {

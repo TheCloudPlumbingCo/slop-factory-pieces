@@ -36,7 +36,7 @@ describe("buildJql", () => {
   it("strips JQL-significant characters and adds a key clause for issue keys", () => {
     expect(buildJql('a" OR 1=1')).toBe('(summary ~ "a OR 1 1*") ORDER BY updated DESC');
     expect(buildJql("pay-12")).toContain('key = "PAY-12"');
-    expect(buildJql("")).toBe("ORDER BY updated DESC");
+    expect(buildJql("")).toBe("updated >= -90d ORDER BY updated DESC");
   });
 });
 
