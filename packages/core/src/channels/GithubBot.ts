@@ -20,8 +20,8 @@ import {
 import { Config, Effect, type Layer, Option } from 'effect'
 
 import { decideGitHubMention, gitHubMentionDiscussion } from './GithubMention'
-import { handOff } from './Handoff'
-import { type AgentSessions } from './Ports'
+import { handOff } from '../Handoff'
+import { type AgentSessions } from '../Ports'
 
 const githubRepositoryLogAnnotations = (ref: GitHubRepositoryRef) => ({
 	'github.owner': ref.owner,

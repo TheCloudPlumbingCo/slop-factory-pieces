@@ -16,7 +16,8 @@
   "workspaces": [
     "packages/core",
     "infra/cloudfare",
-    "infra/aws"
+    "infra/aws",
+    "infra/azure"
   ],
   "overrides": {
     "@humanlayer/channels-delivery": "0.1.0",

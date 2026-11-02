@@ -1,0 +1,29 @@
+{
+	"name": "slop-code-factory-azure",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"test": "vitest --run",
+		"bundle": "bun scripts/bundle.ts",
+		"typecheck": "tsc --noEmit -p tsconfig.json"
+	},
+	"dependencies": {
+		"@azure/cosmos": "4.10.1",
+		"@azure/functions": "4.17.0",
+		"@azure/identity": "4.14.0",
+		"@azure/service-bus": "7.10.0",
+		"@effect/platform-node": "4.0.0",
+		"@humanlayer/channels-delivery": "0.1.0",
+		"@humanlayer/channels-github": "0.1.0",
+		"@humanlayer/channels-jira": "file:../../infra/cloudfare/vendor/humanlayer-channels-jira-0.0.0-85830e9.tgz",
+		"@slop/core": "*",
+		"effect": "4.0.0",
+		"jose": "6.2.14"
+	},
+	"devDependencies": {
+		"@effect/vitest": "4.0.0",
+		"esbuild": "0.28.2",
+		"typescript": "7.0.2",
+		"vitest": "5.0.1"
+	}
+}

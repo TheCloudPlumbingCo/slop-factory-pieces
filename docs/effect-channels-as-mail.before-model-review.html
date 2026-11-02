@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Effect Channels as Mail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Platform comparison and animated mail analogy. Reviewed against workspace source on 2026-11-01. */
+:root{
+  --bg:#f5f6f4; --ink:#1b2321; --muted:#5b6662; --line:#d6dbd8; --card:#ffffff;
+  --ch:#0b7a66; --cl:#c2571a; --you:#2f62c9; --ext:#6b7773;
+  --display:"Fraunces",Georgia,serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#121715;--ink:#e6ebe8;--muted:#9aa6a1;--line:#2c3532;--card:#1a211f;--ch:#4fc4a8;--cl:#f0935a;--you:#8ab4ff;--ext:#9aa6a1;color-scheme:dark}
+}
+:root[data-theme="dark"]{--bg:#121715;--ink:#e6ebe8;--muted:#9aa6a1;--line:#2c3532;--card:#1a211f;--ch:#4fc4a8;--cl:#f0935a;--you:#8ab4ff;--ext:#9aa6a1;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:400 16px/1.55 var(--body);padding:32px 16px 64px}
+main{max-width:940px;margin:0 auto}
+h1{font:600 clamp(28px,5vw,38px)/1.15 var(--display);margin:0 0 6px;text-wrap:balance}
+h2{font:600 22px/1.25 var(--display);margin:8px 0 6px;text-wrap:balance}
+h3{font:500 15px/1.3 var(--body);margin:0 0 8px}
+.sub{color:var(--muted);margin:0 0 14px;max-width:70ch}
+code{font-family:var(--mono);font-size:.9em;background:var(--card);border:1px solid var(--line);padding:1px 5px;border-radius:3px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:18px 0 16px;flex-wrap:wrap}
+.tabs button{font:500 15px var(--body);color:var(--muted);background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px;cursor:pointer}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ch)}
+.tabs button:focus-visible,.controls button:focus-visible{outline:2px solid var(--ch);outline-offset:2px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin:0 0 8px}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;border:2px solid}
+.legend .o-ext i{border-color:var(--ext)} .legend .o-ch i{border-color:var(--ch)} .legend .o-cl i{border-color:var(--cl)} .legend .o-you i{border-color:var(--you)}
+.legend .dashed i{border-style:dashed;border-color:var(--cl)}
+figure{margin:0;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px;overflow-x:auto}
+figure svg{display:block;width:100%;min-width:680px;height:auto;color:var(--ink)}
+figcaption.cap{font-size:15px;min-height:3em;margin-top:8px;padding:0 4px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0}
+.controls button{font:500 15px var(--body);color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:4px;padding:8px 16px;cursor:pointer}
+.controls button:hover{border-color:var(--ch)}
+.controls .count{color:var(--muted);font-family:var(--mono);font-size:14px;margin-left:8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin:8px 0}
+.card{background:var(--card);border:1px solid var(--line);border-top:4px solid var(--ext);border-radius:4px;padding:12px 16px}
+.card.ch{border-top-color:var(--ch)} .card.cl{border-top-color:var(--cl)}
+.card ul{margin:0;padding-left:18px;font-size:15px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.chips span{border:1px solid var(--cl);color:var(--ink);border-radius:999px;padding:4px 12px;font-size:14px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:4px;background:var(--card);margin:10px 0}
+table{border-collapse:collapse;width:100%;min-width:480px;font-size:15px}
+th,td{text-align:left;padding:8px 14px;border-bottom:1px solid var(--line)}
+th{font-weight:500;color:var(--muted);font-size:13px}
+tr:last-child td{border-bottom:0}
+td.f{font-weight:500;white-space:nowrap}
+/* svg parts */
+svg text{font-family:var(--body)}
+.ghost{stroke:var(--muted);stroke-width:1.5;opacity:.25;fill:none}
+.ghost.hl{opacity:.7;stroke-width:2.5}
+.ghost.dim{opacity:.08}
+.edge{stroke:var(--ink);stroke-width:2.5;fill:none;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .7s ease}
+.edge.hl{stroke-width:4}
+.edge.dim{opacity:.1}
+.node{cursor:pointer;opacity:.6;transition:opacity .3s}
+.node rect{fill:var(--card);stroke-width:2}
+.own-ext rect{stroke:var(--ext)} .own-ch rect{stroke:var(--ch)} .own-cl rect{stroke:var(--cl)} .own-you rect{stroke:var(--you)}
+.node.need rect{stroke-dasharray:6 4}
+.node.lit{opacity:1}
+.node.lit.own-ext rect{fill:color-mix(in srgb,var(--ext) 14%,var(--card))}
+.node.lit.own-ch rect{fill:color-mix(in srgb,var(--ch) 16%,var(--card))}
+.node.lit.own-cl rect{fill:color-mix(in srgb,var(--cl) 16%,var(--card))}
+.node.lit.own-you rect{fill:color-mix(in srgb,var(--you) 16%,var(--card))}
+.node.dim{opacity:.2}
+.node.nb{opacity:1}
+.node.sel rect{stroke-width:4}
+.node:focus-visible rect{stroke-dasharray:5 3;stroke-width:4}
+.node text{fill:var(--ink);pointer-events:none}
+.node .t1{font-size:13px;font-weight:500}
+.node .t2{font-size:11px;fill:var(--muted)}
+@media (prefers-reduced-motion: reduce){.edge,.node{transition:none}}
+.story{list-style:none;margin:16px 0 8px;padding:0;display:grid;gap:10px}
+.story li{display:grid;grid-template-columns:36px 1fr;gap:12px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:4px;padding:12px 16px;opacity:.78;transition:opacity .3s,border-left-color .3s}
+.story li.current{border-left-color:var(--ch);opacity:1}
+.story .n{font-family:var(--mono);font-weight:500;color:var(--cl)}
+.story h3{margin:0 0 4px}
+.story p{margin:0 0 4px;max-width:66ch}
+.story .lib{color:var(--muted);font-size:14px}
+.grp{fill:none;stroke-width:2}
+.grp.own-cl{stroke:var(--cl);fill:color-mix(in srgb,var(--cl) 6%,var(--card))}
+.grp.own-ext{stroke:var(--ext)}
+.grp.own-ch{stroke:var(--ch);fill:color-mix(in srgb,var(--ch) 5%,var(--card))}
+.grp.own-you{stroke:var(--you)}
+.grp.dashed,.abox.dashed{stroke-dasharray:6 4}
+.gt{font-size:13px;font-weight:500;fill:var(--ink)}
+.gr{font-size:11px;fill:var(--muted)}
+.abox{fill:var(--card);stroke-width:2}
+.abox.own-ch{stroke:var(--ch)} .abox.own-cl{stroke:var(--cl)} .abox.own-you{stroke:var(--you)} .abox.own-ext{stroke:var(--ext)}
+.bt{font-size:13px;font-weight:500;fill:var(--ink)}
+.bs{font-size:11px;fill:var(--muted)}
+.arr{stroke:var(--ink);stroke-width:2;fill:none}
+.arr.dashed{stroke-dasharray:5 4}
+.alab{font-size:11px;fill:var(--muted)}
+.bdg{fill:var(--ink)}
+.bdt{font-size:11px;font-weight:500;fill:var(--card)}
+.arch{margin:6px 0 12px}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<main>
+  <h1>Effect Channels as a mail system</h1>
+  <p class="sub">A GitHub mention is a letter. Channels supplies the mail-handling rules. Durable Objects supply storage, coordination and a bell to wake the clerk.</p>
+  <p class="sub"><small>Reviewed against the workspace · 1 November 2026 · Source notes below</small></p>
+
+  <div class="tabs" role="tablist" aria-label="Deployment">
+    <button role="tab" id="tab-why" aria-selected="true" aria-controls="panel-why" data-tab="why">Why this library?</button>
+    <button role="tab" id="tab-no-cloud" aria-selected="false" aria-controls="panel-no-cloud" data-tab="no-cloud">The mail story</button>
+    <button role="tab" id="tab-requirements" aria-selected="false" aria-controls="panel-requirements" data-tab="requirements">Requirements</button>
+    <button role="tab" id="tab-cloudflare" aria-selected="false" aria-controls="panel-cloudflare" data-tab="cloudflare">Cloudflare</button>
+    <button role="tab" id="tab-azure" aria-selected="false" aria-controls="panel-azure" data-tab="azure">Azure</button>
+    <button role="tab" id="tab-aws" aria-selected="false" aria-controls="panel-aws" data-tab="aws">AWS</button>
+  </div>
+
+  <section id="panel-why" role="tabpanel" aria-labelledby="tab-why">
+    <h2>The actual problem: remembering unfinished work</h2>
+    <p>Receiving a webhook and posting a reply is straightforward. The difficulty starts when the same webhook arrives twice, another comment arrives during a run, the server crashes, or GitHub refuses the finished reply.</p>
+    <div class="cards">
+      <div class="card cl"><h3>Durable Objects give you tools</h3><ul><li>An object identity: calls for the same key reach the same object.</li><li>Persistent storage and transactions.</li><li>One scheduled alarm per object, to wake it later.</li></ul></div>
+      <div class="card ch"><h3>Channels supplies the conversation rules</h3><ul><li>Recognize duplicate events and save accepted ones.</li><li>Group messages into turns; hold later turns while one is active.</li><li>Recover callback work and retry saved replies separately.</li><li>Connect provider webhooks and agent updates to the right conversation.</li></ul></div>
+    </div>
+    <p><strong>A Durable Object can run a queue you write. Channels is the queue and delivery logic already written for conversations.</strong> The library uses a DO on Cloudflare, or database adapters elsewhere.</p>
+    <h2>One concrete failure</h2>
+    <p>Priya asks the bot to investigate issue 57. The agent finishes, but GitHub is down. Channels saves the requested answer and retries sending it. It does not need to run the finished callback again just to post that saved answer.</p>
+    <p>DO storage keeps the record; its alarm wakes the retry. <strong>Channels decides what the record means and which action to retry.</strong> A DO does not understand “GitHub reply” by itself.</p>
+    <h2>What you still build</h2>
+    <p>Your application decides who may invoke the bot, which commands it accepts, where the agent runs and what it does. Starting a remote job should be safe to repeat, using the delivery ID as its job key. Durable mailbox state does not automatically checkpoint an agent’s execution.</p>
+    <h2>Can I do this without a cloud?</h2>
+    <p>Yes. Run an HTTP server and Postgres yourself. Channels’ SQL adapter saves mailbox state and the engine polls for due work. You operate the server and database; Channels still provides the delivery rules. The memory adapter is useful for local experiments but forgets its state on restart.</p>
+    <p class="sub">For a small bot where lost or duplicate replies are acceptable, you may only need a simple webhook handler. Channels earns its place when reliable turns, retries, handoff or multiple providers matter.</p>
+    <p class="sub">Start with “The mail story”, then “Requirements” for the responsibility split. The platform tabs show what this workspace actually wires up.</p>
+  </section>
+  <section id="panel-no-cloud" role="tabpanel" aria-labelledby="tab-no-cloud" hidden>
+    <h2>The story of one letter</h2>
+    <p class="sub">Priya writes a comment on issue 57. Follow her letter to the reply. Press Play and the story below follows the animation. This is a platform-neutral story, including the optional remote-agent pattern. Dashed orange boxes are capabilities you must supply, hosted or self-managed.</p>
+    <div class="anim" data-cfg="no-cloud"></div>
+    <ol class="story">
+      <li><div class="n">1</div><div><h3>The letter</h3><p>Priya writes "@bot please fix this" on issue 57. GitHub seals it in an envelope and posts it to the town's front door.</p><p class="lib">In the library: a webhook arrives.</p></div></li>
+      <li><div class="n">2</div><div><h3>The stamp</h3><p>A clerk checks the stamp on the envelope. A forged letter goes in the bin.</p><p class="lib">In the library: the webhook signature is verified. A bad one fails with <code>WebhookAuthenticationError</code>.</p></div></li>
+      <li><div class="n">3</div><div><h3>Filing</h3><p>The clerk reads the address: issue 57. Every letter about issue 57 goes into the same PO box. If the same letter comes twice, the clerk ignores the copy. Only after the letter is filed does the clerk hand GitHub a receipt.</p><p class="lib">In the library: the mailbox key names the box. Repeat events are skipped. The 2xx comes after the save.</p></div></li>
+      <li><div class="n">4</div><div><h3>The PO boxes</h3><p>The clerk writes accepted letters into persistent storage, so a process restart does not erase them.</p><p class="lib">In the library: the storage adapter saves mailbox state. A hosted or self-managed database provides persistence.</p></div></li>
+      <li><div class="n">5</div><div><h3>The bell</h3><p>Each box has a bell. When mail is waiting, the bell rings. Where a box cannot ring by itself, the clerk drops a note in the carrier's tray: "come to box 57 at 3:05".</p><p class="lib">In the library: due-work processing. The adapter and host connect it to an alarm, a poller, or a queued nudge.</p></div></li>
+      <li><div class="n">6</div><div><h3>The carrier</h3><p>The carrier arrives. The carrier reserves one bundle for processing. New letters can still be filed, but cannot start another turn while this delivery is active. A retryable failure can run the same bundle again.</p><p class="lib">In the library: claim with a renewable lease, batch in mailbox admission order, and retry within the configured attempt limit. A lease is not a lock on arbitrary external side effects.</p></div></li>
+      <li><div class="n">7</div><div><h3>The recipient</h3><p>The carrier hands the bundle to the recipient. The recipient reads "please fix this".</p><p class="lib">In the library: your callback runs, for example <code>onMentioned</code>.</p></div></li>
+      <li><div class="n">8</div><div><h3>The courier</h3><p>The job is long. The recipient hires a courier in another town, such as a sandbox or a pipeline. The courier gets a tracking id and a key.</p><p class="lib">In the library: hand off. The delivery id and its access token go to the remote worker.</p></div></li>
+      <li><div class="n">9</div><div><h3>The tracking calls</h3><p>The courier phones the tracking desk: "started", "step 2", "done".</p><p class="lib">In the library: the delivery API receives progress, plan, messages, and the result over HTTP.</p></div></li>
+      <li><div class="n">10</div><div><h3>The reply</h3><p>The tracking desk saves the requested output before the clerk sends it to GitHub. If GitHub is down, the clerk retries the saved output. Priya eventually reads the reply on issue 57.</p><p class="lib">In the library: Channels translates saved delivery-API output into provider calls and retries output separately from callbacks. A crash after a successful post can still cause a duplicate comment.</p></div></li>
+    </ol>
+    <h3>The same bell, three ways</h3>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Platform</th><th>How the carrier learns a box has mail</th><th>If a note is lost</th></tr></thead>
+      <tbody>
+        <tr><td class="f">Cloudflare</td><td>the box's own Durable Object alarm</td><td>storage writes set the alarm with the state; after processing, the handler repairs a missing or past alarm. Cloudflare also retries a throwing alarm handler, with a bounded retry policy</td></tr>
+        <tr><td class="f">Azure</td><td>a note on a Service Bus queue</td><td>a timer Sweep every minute</td></tr>
+        <tr><td class="f">AWS</td><td>an SQS note with a delay, up to 900 s</td><td>an EventBridge Sweep every minute</td></tr>
+      </tbody>
+    </table></div>
+    <p class="sub">After the story: Priya can ask the clerk to forward future mail from issue 57. That is subscribing to the issue.</p>
+  </section>
+
+  <section id="panel-requirements" role="tabpanel" aria-labelledby="tab-requirements" hidden>
+    <h2>Who does what: the library or the platform</h2>
+    <p class="sub">Cloudflare is not doing the library's job. effect-channels decides the rules for a letter. The platform only has to keep a few promises. This tab lists those promises with no product names first, then shows who keeps each one.</p>
+
+    <div class="arch" data-arch="split"></div>
+
+    <h3>The actor idea, in the library's words</h3>
+    <div class="arch" data-arch="actor"></div>
+    <p class="sub">The actor analogy helps: one conversation owns a mailbox and one active delivery. But a Channels mailbox can be a database record processed by different workers; it need not be a permanently running actor. Its accepted inbox is persisted.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Actor idea</th><th>In effect-channels</th></tr></thead>
+      <tbody>
+        <tr><td class="f">Private data</td><td>Mailbox state tracks waiting events, the active batch, retries and the next due time. Seen-event markers can be separate records; the exact schema depends on the adapter.</td></tr>
+        <tr><td class="f">Address</td><td>The mailbox key, worked out from the event (for example, issue 57 of one repo).</td></tr>
+        <tr><td class="f">Messages in a queue</td><td>Accepted events are persisted and assigned sequence numbers. This order is the order admitted to the mailbox, not a reconstruction of an upstream order if webhooks arrived out of order.</td></tr>
+        <tr><td class="f">One at a time</td><td>A claim with an id and a lease. Only the current claim may change the claimed delivery state. After a lease expires, a retry may start; a stale worker’s external side effects still require care.</td></tr>
+        <tr><td class="f">Messages can be lost or repeated</td><td>Save before the 2xx. Skip an event key already seen. Retry the same bundle after a failure. This is the at-least-once pattern from the notes.</td></tr>
+        <tr><td class="f">An agent’s result updates its delivery</td><td>The remote worker reports over the delivery API. Its result and output operations are saved against the active delivery. They do not become a new waiting webhook or callback turn.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>The life of one box</h3>
+    <div class="arch" data-arch="life"></div>
+
+    <h3>Eight requirements</h3>
+    <p class="sub">The middle two columns hold the split: the library decides what must be true, and the platform must make it possible. The last column shows how each platform meets it.</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>#</th><th>Requirement</th><th>effect-channels does</th><th>The platform must give</th><th>How platforms give it</th></tr></thead>
+      <tbody>
+        <tr><td class="f">1</td><td>Letters about the same thing reach the same box</td><td>Works out the mailbox key from the event.</td><td>A way to find and safely update the same logical mailbox by key; it need not be one running process.</td><td>Cloudflare: an object found by name. Azure and AWS: the key is the item key in the database.</td></tr>
+        <tr><td class="f">2</td><td>A letter is safe before GitHub gets a receipt</td><td>Saves the event, then returns 2xx.</td><td>A write that survives a crash before it answers.</td><td>Cloudflare: object storage. Azure: Cosmos DB. AWS: DynamoDB.</td></tr>
+        <tr><td class="f">3</td><td>A repeated letter changes nothing</td><td>Checks the event key in the same write as the save.</td><td>An atomic duplicate check and state update, including any separate seen-event marker.</td><td>Cloudflare: a storage transaction. Azure: a Cosmos batch. AWS: a DynamoDB transaction.</td></tr>
+        <tr><td class="f">4</td><td>One carrier works a box at a time</td><td>Claims the box with an id and a lease. An expired lease can be taken over.</td><td>An atomic read-then-write on the box record, so two claimers cannot both win.</td><td>Cloudflare: storage transactions. Azure: conditional Cosmos batches. AWS: conditional DynamoDB transactions. DOs are single-threaded, but asynchronous calls can interleave; that alone does not serialize a whole agent turn.</td></tr>
+        <tr><td class="f">5</td><td>Letters go out in order, as a bundle, and a failure repeats the same bundle</td><td>Orders by sequence number, freezes the bundle, and reclaims the frozen bundle after a failure.</td><td>The durable state, atomic claims and wake-ups above.</td><td>The rules come from the library, with an adapter that correctly enforces its storage contract.</td></tr>
+        <tr><td class="f">6</td><td>Someone comes back at the right time</td><td>Keeps a next-due time on the box: now for new mail, later for a retry or an expired lease.</td><td>A wake-up for a given box at a given time. It must survive restarts.</td><td>Cloudflare: an alarm, set in the same transaction as the box write. Azure and AWS: a queue note with a delay, plus a sweep.</td></tr>
+        <tr><td class="f">7</td><td>A lost wake-up is put back</td><td>Cloudflare’s adapter repairs a missing or past alarm after processing. The AWS and Azure hosts scan overdue mailboxes and send fresh nudges.</td><td>A way to see whether a wake-up exists, or to scan for due boxes.</td><td>Cloudflare: reads the alarm. Azure and AWS: a sweep every minute.</td></tr>
+        <tr><td class="f">8</td><td>A long job's result returns to the same box</td><td>Gives the remote worker a delivery id and a key. Its updates change the active delivery and its saved output; they can make output processing due.</td><td>A way for an outside request to reach one specific box.</td><td>Cloudflare: the Worker forwards each call to the box's object. Azure and AWS: not connected yet, per the tabs above.</td></tr>
+      </tbody>
+    </table></div>
+
+    <h3>What this says about Cloudflare</h3>
+    <div class="cards">
+      <div class="card ch"><h3>effect-channels alone</h3><ul><li>Dedupe, claim and lease, order, batching and retry rules; their enforcement requires atomic storage from the adapter.</li><li>The decision of when a box is next due.</li><li>The delivery API and the hand-off to a courier.</li></ul></div>
+      <div class="card cl"><h3>Cloudflare alone</h3><ul><li>Addressing by name (1).</li><li>Durable storage with transactions (2, 3).</li><li>A durable timer per box (6).</li></ul></div>
+    </div>
+    <p class="sub">Durable Objects combine identity, persistent storage and an alarm. Our Cloudflare deployment defines one Worker and two DO classes (mailbox and AgentSession), with many independently running objects. It needs no mailbox poller. A platform without them needs extra parts to fill the same gaps: a nudge queue and a sweep on Azure and AWS, or a poller on a plain database. The rules above do not change.</p>
+    <p class="sub">This integration is at least once: callbacks may repeat, and posting a new comment can repeat after a crash between posting and recording success. Delivery-API output retries are separate from callback retries. Direct provider calls inside a callback remain that callback’s repeatable side effects. AWS and Azure dedup markers have a 30-day TTL, so deduplication is not a forever guarantee.</p>
+  </section>
+
+  <section id="panel-cloudflare" role="tabpanel" aria-labelledby="tab-cloudflare" hidden>
+    <h2>How the story is deployed on Cloudflare</h2>
+    <p class="sub">One Worker deployment defines the ingress Worker and DO classes. Their running instances are separate. The numbers on the boxes are the story chapters.</p>
+    <div class="arch" data-arch="cloudflare"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Chapter</th><th>Component</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="f">1 The letter</td><td>Worker</td><td>A public HTTPS address with no server to run.</td></tr>
+        <tr><td class="f">2 The stamp</td><td><code>bot.routes</code></td><td>effect-channels checks the signature before anything is saved.</td></tr>
+        <tr><td class="f">3 Filing</td><td>Worker, then the box's Durable Object</td><td>The box address picks one object. The save and the duplicate check happen in one storage transaction.</td></tr>
+        <tr><td class="f">4 The PO boxes</td><td>Durable Object storage</td><td>The data sits with the object and is strongly consistent. No separate database.</td></tr>
+        <tr><td class="f">5 The bell</td><td>Durable Object alarm</td><td>Set to the time the box is due. Cloudflare rings it. No poller.</td></tr>
+        <tr><td class="f">6 The carrier</td><td>Engine inside the object</td><td>The alarm runs the engine: claim, order, bundle. Transactions and saved delivery state enforce one active delivery; asynchronous DO calls can interleave.</td></tr>
+        <tr><td class="f">7 The recipient</td><td>Your callbacks, inside the object</td><td>They run where the box lives.</td></tr>
+        <tr><td class="f">8 The courier</td><td>AgentSession Durable Object in this workspace</td><td>Our application starts an echo task in a separate object. The sibling SDK example instead uses FakeRemoteAgent. A real remote agent remains an application choice.</td></tr>
+        <tr><td class="f">9 Tracking calls</td><td><code>bot.deliveryApi</code></td><td>The Worker forwards each call to the box that owns the delivery.</td></tr>
+        <tr><td class="f">10 The reply</td><td>Provider API calls</td><td>The engine posts the updates to Slack, GitHub or Linear.</td></tr>
+      </tbody>
+    </table></div>
+    <h2>Is the Durable Object inside the same compute?</h2>
+    <p class="sub">Same deployed bundle, separate running instances. Ingress Worker memory is not durable shared state. Calls for one DO identity reach its active instance, with its own persistent storage and alarm; its in-memory state can disappear on restart.</p>
+    <div class="arch" data-arch="do"></div>
+    <p class="sub">The mailbox’s alarm is owned by Channels. A DO can have one alarm scheduled at a time; Cloudflare supplies bounded retries for a throwing handler, while Channels implements delivery retry policy. The separate AgentSession currently starts a detached echo task and saves no agent checkpoints. Persistent mailbox state does not make that task resumable.</p>
+    <h2>Watch the letter move</h2>
+    <div class="anim" data-cfg="cloudflare"></div>
+  </section>
+
+  <section id="panel-azure" role="tabpanel" aria-labelledby="tab-azure" hidden>
+    <h2>How the story is deployed on Azure</h2>
+    <p class="sub">From <code>infra/azure</code> in slop-factory-pieces. It uses the library's webhook routes and mailbox engine, with its own Cosmos DB mailbox store. Its README says nothing has run on real Azure yet.</p>
+    <div class="arch" data-arch="azure"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Chapter</th><th>Component</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="f">1 The letter</td><td>Receiver: an Azure Functions HTTP trigger</td><td>A public webhook URL. Load is bounded by <code>max_scale_out</code> (default 5). There is no throttle in front.</td></tr>
+        <tr><td class="f">2 The stamp</td><td>Receiver, using the library's webhook routes</td><td>The signature is checked before anything is saved.</td></tr>
+        <tr><td class="f">3 Filing</td><td>Cosmos DB: one item per box, plus dedup markers</td><td>One transactional batch with a version check. A known event key returns "duplicate" and stores nothing.</td></tr>
+        <tr><td class="f">4 The PO boxes</td><td>Cosmos container</td><td>The box is one versioned item. Dedup is per box (partition key), not global.</td></tr>
+        <tr><td class="f">5 The bell</td><td>Service Bus nudge, and a timer Sweep</td><td>After a write the store sends a nudge note with the box key. The Sweep runs every minute and re-sends a note for any box past its <code>readyAt</code>. That recovers lost notes.</td></tr>
+        <tr><td class="f">6 The carrier</td><td>Processor: a Service Bus trigger</td><td>It runs the library's mailbox engine for that box, then nudges again if the box is still due. The engine's claim and lease make a duplicate nudge harmless.</td></tr>
+        <tr><td class="f">7 The recipient</td><td>Echo agent, inside the Processor</td><td>The callback runs in the same invocation.</td></tr>
+        <tr><td class="f">8 The courier</td><td>Not connected yet</td><td>No external worker is wired. The echo task does use handoff and an in-process delivery client; its delivery API is not exposed for remote HTTP access.</td></tr>
+        <tr><td class="f">9 Tracking calls</td><td>Not connected yet</td><td>The same reason.</td></tr>
+        <tr><td class="f">10 The reply</td><td>GitHub API, from the Processor</td><td>The echo reply is posted about 5 seconds after the mention.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="sub">Terraform also defines Key Vault (five GitHub secrets, created by hand), monitoring and a budget alert. Known limits from the README: the Cosmos calls are untested against a real account, and the mailbox logic is a copy of the AWS code that must be changed in both places.</p>
+    <h2>Watch the letter move</h2>
+    <div class="anim" data-cfg="azure"></div>
+  </section>
+  <section id="panel-aws" role="tabpanel" aria-labelledby="tab-aws" hidden>
+    <h2>How the story is deployed on AWS</h2>
+    <p class="sub">From <code>infra/aws</code> in slop-factory-pieces. Same bot behaviour as the Cloudflare version, built from API Gateway, Lambda, DynamoDB, SQS and EventBridge Scheduler. Deployment status is not established by this review; this explanation checks source, not a live AWS account.</p>
+    <div class="arch" data-arch="aws"></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Chapter</th><th>Component</th><th>Why</th></tr></thead>
+      <tbody>
+        <tr><td class="f">1 The letter</td><td>API Gateway HTTP API</td><td>One route: <code>POST /integrations/github/webhook</code>. It passes the request to the Receiver Lambda.</td></tr>
+        <tr><td class="f">2 The stamp</td><td>Receiver Lambda</td><td>It verifies the signature.</td></tr>
+        <tr><td class="f">3 Filing</td><td>DynamoDB: one item per issue or PR</td><td>The event and its dedup marker are written in one transaction, so a redelivery does nothing a second time.</td></tr>
+        <tr><td class="f">4 The PO boxes</td><td>DynamoDB table</td><td>Durable. An item is limited to 400 KB, and waiting events carry the full webhook payload.</td></tr>
+        <tr><td class="f">5 The bell</td><td>SQS nudge, and an EventBridge Sweep</td><td>The note is delayed by <code>readyAt - now</code>, capped at 900 s. It is a standard queue because FIFO has no per-message delay. A Sweep every minute re-nudges due boxes.</td></tr>
+        <tr><td class="f">6 The carrier</td><td>Processor Lambda</td><td>One message per invocation, 30 s timeout. At most 20 passes, and no new pass after 15 s. Then it nudges again. A failed record is retried, and after 5 receives it goes to the dead-letter queue.</td></tr>
+        <tr><td class="f">7 The recipient</td><td>Echo agent, inside the Processor</td><td>It waits 5 s, then replies.</td></tr>
+        <tr><td class="f">8 The courier</td><td>Not connected</td><td>Handoff is used inside the Processor, but the delivery API is not exposed through API Gateway. External handoff over HTTP is not exercised.</td></tr>
+        <tr><td class="f">9 Tracking calls</td><td>Not connected</td><td>The same reason.</td></tr>
+        <tr><td class="f">10 The reply</td><td>GitHub API, from the Processor</td><td>Posting is at least once. GitHub comments have no idempotency key, so a crash can cause a double post.</td></tr>
+      </tbody>
+    </table></div>
+    <p class="sub">Settings come from SSM Parameter Store at cold start. Known limit: GitHub does not redeliver a failed webhook by itself, so a failed Receiver response may leave an event unaccepted; an operator must redeliver if it was not saved. A failed response alone does not prove the write never committed.</p>
+    <h2>Watch the letter move</h2>
+    <div class="anim" data-cfg="aws"></div>
+  </section>
+
+  <details class="card" style="margin-top:28px">
+    <summary>Review notes and source evidence</summary>
+    <p>The original mail metaphor and navigation are preserved. Corrected: DO async interleaving; result handling on the active delivery; separate callback and output retries; the workspace’s AgentSession versus the SDK demo; in-process handoff on AWS/Azure; and bounded guarantees.</p>
+    <p>This review checks local code, not live deployments. The application pins published SDK 0.1.0 packages and vendors Jira. The sibling effect-channels checkout may differ from that installed version. Older draft docs can disagree with current code.</p>
+    <ul>
+      <li>Application: <a href="../infra/cloudfare/src/DeliveryMailboxDO.ts">mailbox DO</a>, <a href="../infra/cloudfare/src/AgentSessionDO.ts">AgentSession</a>, <a href="../packages/core/src/Handoff.ts">handoff</a>.</li>
+      <li>Host wiring and limits: <a href="../infra/aws/README.md">AWS README</a>, <a href="../infra/aws/src/Handlers.ts">AWS handlers</a>, <a href="../infra/azure/README.md">Azure README</a>, <a href="../infra/azure/src/CosmosMailboxTable.ts">Cosmos store</a>.</li>
+      <li>Library: <a href="../../effect-channels/README.md">SDK README</a>, <a href="../../effect-channels/packages/alchemy-cloudflare/src/MailboxDelivery.ts">event deduplication</a>, <a href="../../effect-channels/packages/alchemy-cloudflare/src/MailboxAlarm.ts">alarm handler</a>, <a href="../../effect-channels/packages/delivery/src/DeliveryLifecycle.ts">delivery lifecycle and output state</a>.</li>
+      <li>Platform: <a href="https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/">Cloudflare coordination and async interleaving</a>; <a href="https://developers.cloudflare.com/durable-objects/api/alarms/">alarm semantics and retry limits</a>.</li>
+    </ul>
+    <p class="sub">Relative source links work in the workspace copy under docs/. The Downloads copy has the same explanation and controls.</p>
+  </details>
+</main>
+
+<script>
+(function(){
+  var NS='http://www.w3.org/2000/svg', W=170, H=60;
+  function el(name,attrs,parent){var e=document.createElementNS(NS,name);for(var k in attrs){e.setAttribute(k,attrs[k]);}if(parent){parent.appendChild(e);}return e;}
+  function h(tag,cls,text,parent){var e=document.createElement(tag);if(cls){e.className=cls;}if(text!=null){e.textContent=text;}if(parent){parent.appendChild(e);}return e;}
+
+  var POS={n1:[20,70],n2:[250,70],n3:[480,70],n4:[480,190],n5:[710,190],n6:[710,310],n7:[480,310],n8:[250,310],n9:[20,310],n10:[250,430],n11:[480,430]};
+  var FLOW=[['n1','n2','M190,100 L250,100'],['n2','n3','M420,100 L480,100'],['n3','n4','M565,130 L565,190'],['n4','n5','M650,220 L710,220'],['n5','n6','M795,250 L795,310'],['n6','n7','M710,340 L650,340'],['n7','n8','M480,340 L420,340'],['n8','n9','M250,340 L190,340'],['n9','n10','M105,370 L105,460 L250,460'],['n10','n11','M420,460 L480,460']];
+  var BASE={
+    n1:['Sender','GitHub, Jira, Slack','ext'],
+    n3:['Check the stamp','verify the signature','ch'],
+    n4:['File the letter','save under the box key','ch'],
+    n7:['Carrier','claim, order, bundle','ch'],
+    n8:['Recipient','your callback','you'],
+    n9:['Courier','remote worker, over HTTP','you'],
+    n10:['Tracking desk','delivery API','ch'],
+    n11:['The thread','replies appear here','ext']
+  };
+  var CAP=[
+    null,
+    'A sender drops a letter: someone mentions the bot. It reaches the front door.',
+    'effect-channels checks the stamp: the webhook signature.',
+    'It files the letter under the box address. One box per issue. A repeat letter is ignored.',
+    null,
+    null,
+    'The bell rings. effect-channels, the carrier, claims the box, keeps order and bundles the letters.',
+    'The carrier hands the bundle to your callback.',
+    'Your callback hands the job to a courier (the remote worker) with a tracking id and a key.',
+    'The courier calls the tracking desk over HTTP: progress, plan, messages, done.',
+    'effect-channels posts the updates in the thread.'
+  ];
+  var CHANNELS_CARD=['verify the stamp (webhook signature)','file by box address, skip repeats','order, claim and bundle the letters','retry the same bundle on failure','tracking desk: the delivery API','post updates in the thread'];
+
+  var CFG={
+    'no-cloud':{
+      aria:'A letter travels from a sender to a front door, is checked and filed in a PO box, a bell rings, the carrier bundles it for your callback, which hands the job to a courier who reports to the tracking desk, and updates appear in the thread.',
+      need:true,
+      cloud:{n2:['Front door','any HTTP endpoint'],n5:['PO boxes','durable storage'],n6:['Bell','alarm or poller']},
+      cap1:'A sender drops a letter: someone mentions the bot. It reaches the front door, an HTTP endpoint.',
+      cap4:'The letter goes into a PO box: durable storage, one box per issue.',
+      cap5:'Something must ring a bell when a box has mail: an alarm or a poller.',
+      cloudTitle:'A platform must give you',
+      cloudItems:['a front door (HTTP endpoint)','durable storage for the boxes','a wake-up: alarm or poller','somewhere to keep secrets'],
+      chips:['Needs: front door','storage','wake-up','secrets']
+    },
+    'cloudflare':{
+      aria:'The same mail route on Cloudflare: a Worker is the front door, a Durable Object is each PO box, and the Durable Object alarm is the bell.',
+      need:false,
+      cloud:{n2:['Front door','Cloudflare Worker'],n5:['PO boxes','Durable Object per box'],n6:['Bell','Durable Object alarm']},
+      cap1:'The letter reaches the Cloudflare Worker, the front door.',
+      cap4:'A Durable Object holds this box. It is found by the box address, and its storage sits inside it.',
+      cap5:'The object sets an alarm for the time the box is due. Cloudflare wakes the handler; Channels runs due work. You deploy and operate the application, without a separate poller.',
+      cloudTitle:'Cloudflare gives',
+      cloudItems:['Worker: front door and compute','Durable Object: the box and its storage','Alarm: the bell','Secrets and config on the Worker'],
+      chips:['Deploy: 1 stack','1 Worker','Durable Objects come with it']
+    },
+    'azure':{
+      aria:'The same mail route on Azure: an Azure Function is the front door, Postgres tables are the PO boxes, and a poller you run is the bell.',
+      need:false,
+      cloud:{n2:['Front door','Azure Functions (HTTP)'],n5:['PO boxes','Postgres tables'],n6:['Bell','poller you run']},
+      cap1:'The letter reaches an Azure Function (or Container App), the front door.',
+      cap4:'Rows in Azure Database for PostgreSQL hold this box. The SQL store creates the tables.',
+      cap5:'Nothing rings by itself. A timer trigger or an always-on worker polls for due boxes. You run it.',
+      cloudTitle:'Azure gives (my mapping)',
+      cloudItems:['Functions or Container Apps: front door and compute','Postgres: the boxes','Timer trigger or worker: the bell, which you run','Key Vault: secrets'],
+      chips:['Deploy: compute','Postgres','a poller','secrets','migrations']
+    }
+  };
+
+  function nodeSpec(cfg,id){
+    if(cfg.cloud[id]){return {t1:cfg.cloud[id][0],t2:cfg.cloud[id][1],own:'cl',need:cfg.need};}
+    var b=(cfg.nodes&&cfg.nodes[id])||BASE[id];
+    return {t1:b[0],t2:b[1],own:b[2],need:false};
+  }
+
+  function build(host,cfg){
+    var caps=CAP.slice(); caps[1]=cfg.cap1; caps[4]=cfg.cap4; caps[5]=cfg.cap5; if(cfg.caps){Object.keys(cfg.caps).forEach(function(k){caps[k]=cfg.caps[k];});}
+    var legend=h('div','legend',null,host);
+    [['o-ext','Sender and thread'],['o-ch','effect-channels'],['o-cl','Platform services'],['o-you','You']].forEach(function(l){
+      var s=h('span',l[0],null,legend); h('i',null,null,s); s.appendChild(document.createTextNode(l[1]));
+    });
+    if(cfg.need){var d=h('span','o-cl dashed',null,legend); h('i',null,null,d); d.appendChild(document.createTextNode('dashed = you must get one'));}
+
+    var fig=h('figure',null,null,host);
+    var svg=el('svg',{viewBox:'0 0 900 540',role:'img','aria-label':cfg.aria},fig);
+    var mid='ah-'+Math.random().toString(36).slice(2,7);
+    var defs=el('defs',{},svg);
+    var mk=el('marker',{id:mid,viewBox:'0 0 10 10',refX:'9',refY:'5',markerWidth:'7',markerHeight:'7',orient:'auto'},defs);
+    el('path',{d:'M0,0 L10,5 L0,10 z',style:'fill:var(--ink)'},mk);
+    var bg=el('rect',{x:0,y:0,width:900,height:540,fill:'transparent'},svg);
+    var capEl=h('figcaption','cap','Press Play or Step to follow one letter.',fig);
+    capEl.setAttribute('aria-live','polite');
+
+    var edges=FLOW.map(function(f,i){
+      var ghost=el('path',{d:f[2],class:'ghost'},svg);
+      return {from:f[0],to:f[1],d:f[2],ghost:ghost,done:false,cap:caps[i+1]};
+    });
+    edges.forEach(function(e){e.path=el('path',{d:e.d,pathLength:'1',class:'edge'},svg);});
+    var nodes={};
+    Object.keys(POS).forEach(function(id){
+      var s=nodeSpec(cfg,id), p=POS[id];
+      var g=el('g',{class:'node own-'+s.own+(s.need?' need':''),tabindex:'0',role:'button','aria-label':s.t1+', '+s.t2},svg);
+      el('rect',{x:p[0],y:p[1],width:W,height:H,rx:6},g);
+      var a=el('text',{x:p[0]+W/2,y:p[1]+26,'text-anchor':'middle',class:'t1'},g); a.textContent=s.t1;
+      var b=el('text',{x:p[0]+W/2,y:p[1]+45,'text-anchor':'middle',class:'t2'},g); b.textContent=s.t2;
+      nodes[id]={g:g,t1:s.t1,t2:s.t2};
+    });
+
+    var controls=h('div','controls',null,host);
+    var bPlay=h('button',null,'Play',controls), bPause=h('button',null,'Pause',controls), bStep=h('button',null,'Step',controls), bReset=h('button',null,'Reset',controls);
+    [bPlay,bPause,bStep,bReset].forEach(function(b){b.type='button';});
+    var count=h('span','count','0 / '+edges.length,controls);
+
+    var cards=h('div','cards',null,host);
+    var c1=h('div','card ch',null,cards); h('h3',null,'effect-channels does',c1);
+    var u1=h('ul',null,null,c1); CHANNELS_CARD.forEach(function(t){h('li',null,t,u1);});
+    var c2=h('div','card cl',null,cards); h('h3',null,cfg.cloudTitle,c2);
+    var u2=h('ul',null,null,c2); cfg.cloudItems.forEach(function(t){h('li',null,t,u2);});
+    var chips=h('div','chips',null,host); cfg.chips.forEach(function(t){h('span',null,t,chips);});
+
+    var pos=0,timer=null,timeouts=[],sel=null;
+    function marker(){return 'url(#'+mid+')';}
+    function caption(){
+      if(sel){
+        var n=nodes[sel],names=[];
+        edges.forEach(function(e){if(e.from===sel){names.push(nodes[e.to].t1);}if(e.to===sel){names.push(nodes[e.from].t1);}});
+        capEl.textContent=n.t1+' ('+n.t2+'). Connected to: '+names.join(', ')+'.';
+      } else if(pos===0){capEl.textContent='Press Play or Step to follow one letter.';}
+      else{capEl.textContent='Step '+pos+'. '+edges[pos-1].cap;}
+    }
+    function applySel(){
+      var conn={};
+      if(sel){conn[sel]=1;edges.forEach(function(e){if(e.from===sel){conn[e.to]=1;}if(e.to===sel){conn[e.from]=1;}});}
+      Object.keys(nodes).forEach(function(id){
+        var g=nodes[id].g;
+        g.classList.toggle('sel',sel===id);
+        g.classList.toggle('nb',!!sel&&!!conn[id]);
+        g.classList.toggle('dim',!!sel&&!conn[id]);
+      });
+      edges.forEach(function(e){
+        var c=!!sel&&(e.from===sel||e.to===sel);
+        [e.path,e.ghost].forEach(function(p){p.classList.toggle('hl',c);p.classList.toggle('dim',!!sel&&!c);});
+      });
+    }
+    function render(){
+      var lit={};
+      for(var i=0;i<pos;i++){lit[edges[i].from]=1;lit[edges[i].to]=1;}
+      Object.keys(nodes).forEach(function(id){nodes[id].g.classList.toggle('lit',!!lit[id]);});
+      edges.forEach(function(e,i){
+        e.path.style.strokeDashoffset=(i<pos)?'0':'1';
+        if(e.done&&i<pos){e.path.setAttribute('marker-end',marker());}else{e.path.removeAttribute('marker-end');}
+      });
+      applySel(); caption(); count.textContent=pos+' / '+edges.length;
+      host.dispatchEvent(new CustomEvent('animstep',{detail:pos}));
+    }
+    function select(id){sel=id;applySel();caption();}
+    function step(){
+      if(pos>=edges.length){return false;}
+      var e=edges[pos]; e.done=false; pos++; render();
+      timeouts.push(setTimeout(function(){e.done=true;if(edges.indexOf(e)<pos){e.path.setAttribute('marker-end',marker());}},750));
+      return true;
+    }
+    function pause(){if(timer){clearInterval(timer);timer=null;}}
+    function reset(){pause();timeouts.forEach(clearTimeout);timeouts=[];edges.forEach(function(e){e.done=false;});pos=0;sel=null;render();}
+    function play(){if(timer){return;}if(pos>=edges.length){reset();}step();timer=setInterval(function(){if(!step()){pause();}},1500);}
+    host.addEventListener('panelhide',pause);
+    bPlay.addEventListener('click',play);
+    bPause.addEventListener('click',pause);
+    bStep.addEventListener('click',function(){pause();if(!step()){reset();step();}});
+    bReset.addEventListener('click',reset);
+    bg.addEventListener('click',function(){select(null);});
+    Object.keys(nodes).forEach(function(id){
+      var g=nodes[id].g;
+      g.addEventListener('click',function(ev){ev.stopPropagation();select(sel===id?null:id);});
+      g.addEventListener('keydown',function(ev){if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();select(sel===id?null:id);}});
+    });
+    svg.addEventListener('keydown',function(ev){if(ev.key==='Escape'){select(null);}});
+    render();
+  }
+
+  var ARCH={
+    cloudflare:{
+      aria:'Cloudflare deployment: one Alchemy stack deploys one Worker. The Worker holds the routes and a Durable Object class per mailbox with storage, alarm, engine and your callbacks. The AgentSession echo task calls the delivery API through a service binding.',
+      groups:[
+        {x:180,y:15,w:600,h:440,own:'ext',dash:1,t:'This workspace: Cloudflare deployment'},
+        {x:200,y:45,w:560,h:395,own:'cl',t:'Deployed bundle: Worker + DO classes',r:'separate running instances'},
+        {x:215,y:190,w:360,h:235,own:'cl',t:'Durable Object: DeliveryMailbox',r:'one per box address'}
+      ],
+      boxes:[
+        {x:20,y:85,w:130,h:56,own:'ext',t:'Sender',s:'GitHub, Jira, Slack',bg:[1]},
+        {x:215,y:85,w:160,h:56,own:'ch',t:'bot.routes',s:'verify · file',bg:[2,3]},
+        {x:390,y:85,w:160,h:56,own:'ch',t:'Provider API calls',s:'post the replies',bg:[10]},
+        {x:565,y:85,w:180,h:56,own:'ch',t:'bot.deliveryApi',s:'tracking desk',bg:[9]},
+        {x:800,y:85,w:150,h:56,own:'you',t:'External agent',s:'optional future host',bg:[]},
+        {x:230,y:225,w:160,h:50,own:'cl',t:'Storage',s:'state · event ids',bg:[4]},
+        {x:405,y:225,w:155,h:50,own:'cl',t:'Alarm',s:'set to readyAt',bg:[5]},
+        {x:230,y:290,w:330,h:50,own:'ch',t:'effect-channels engine',s:'claim · order · bundle · retry',bg:[6]},
+        {x:230,y:350,w:330,h:50,own:'you',t:'Your callbacks',s:'onMentioned, hand off',bg:[7,8]},
+        {x:610,y:260,w:135,h:110,own:'you',dash:1,t:'AgentSession DO',s:'our echo task|not checkpointed',bg:[8]}
+      ],
+      arrows:[
+        {d:'M150,113 L215,113'},
+        {d:'M295,141 L295,190'},
+        {d:'M655,141 L655,168 L480,168 L480,190',l:'forward to the box',lx:567,ly:161},
+        {d:'M800,113 L745,113',dash:1},
+        {d:'M575,315 L610,315'},
+        {d:'M710,260 L710,141',dash:1}
+      ]
+    },
+    azure:{
+      aria:'Azure deployment (proposed): an Azure Function or Container App holds the routes, PostgreSQL holds the boxes, a timer trigger or worker you run polls and runs the engine and your callbacks, and Key Vault holds secrets.',
+      groups:[
+        {x:180,y:15,w:620,h:440,own:'ext',dash:1,t:'Azure resource group (my mapping)'},
+        {x:200,y:45,w:580,h:125,own:'cl',t:'Azure Function or Container App (HTTP)',r:'front door + compute'},
+        {x:200,y:190,w:230,h:165,own:'cl',t:'Azure PostgreSQL',r:'the boxes'},
+        {x:500,y:190,w:280,h:215,own:'cl',dash:1,t:'Timer trigger or always-on worker',r:'you run this'}
+      ],
+      boxes:[
+        {x:20,y:85,w:130,h:56,own:'ext',t:'Sender',s:'GitHub, Jira, Slack',bg:[1]},
+        {x:215,y:85,w:140,h:56,own:'ch',t:'bot.routes',s:'verify · file',bg:[2,3]},
+        {x:600,y:85,w:165,h:56,own:'ch',t:'bot.deliveryApi',s:'tracking desk',bg:[9]},
+        {x:820,y:85,w:130,h:56,own:'you',t:'Courier',s:'Actions, Jenkins, job',bg:[8,9]},
+        {x:215,y:225,w:200,h:50,own:'cl',t:'delivery_next_* tables',s:'boxes, events, batches',bg:[3,4]},
+        {x:215,y:290,w:200,h:50,own:'cl',t:'Claim rows',s:'one live claim per box',bg:[6]},
+        {x:200,y:370,w:230,h:60,own:'cl',t:'Key Vault',s:'secrets (my addition)',bg:[]},
+        {x:515,y:225,w:250,h:50,own:'cl',t:'Poller',s:'finds boxes that are due',bg:[5]},
+        {x:515,y:285,w:250,h:50,own:'ch',t:'effect-channels engine',s:'claim · order · bundle · retry',bg:[6]},
+        {x:515,y:345,w:250,h:50,own:'you',t:'Your callbacks + replies',s:'and calls to the provider API',bg:[7,10]}
+      ],
+      arrows:[
+        {d:'M150,113 L215,113'},
+        {d:'M285,141 L285,225'},
+        {d:'M682,141 L682,170 L400,170 L400,225',l:'writes updates',lx:540,ly:163},
+        {d:'M820,113 L765,113',dash:1},
+        {d:'M500,250 L430,250',both:1,l:'poll · claim',lx:465,ly:242}
+      ]
+    }
+  };
+  CFG['no-cloud'].cloud.n6=['Bell','alarm, poller or nudge'];
+  CFG['no-cloud'].cap5='Something must tell the carrier a box has mail: an alarm, a poller, or a queued nudge.';
+  CFG['no-cloud'].cloudItems=['a front door (HTTP endpoint)','durable storage for the boxes','a wake-up: alarm, poller or queued nudge','somewhere to keep secrets'];
+  CFG.azure={
+    aria:'The same mail route on Azure: an Azure Functions HTTP trigger is the front door, Cosmos DB items are the PO boxes, and a Service Bus nudge is the bell.',
+    need:false,
+    cloud:{n2:['Front door','Azure Functions (HTTP)'],n5:['PO boxes','Cosmos DB item per box'],n6:['Bell','Service Bus nudge']},
+    cap1:'The letter reaches the Receiver, an Azure Functions HTTP trigger.',
+    cap4:'The Receiver saves one versioned Cosmos item for the box, plus a dedup marker, in one batch.',
+    cap5:'After the save, a nudge note goes on a Service Bus queue. A timer sweep every minute re-sends lost notes.',
+    cloudTitle:'Azure gives',
+    cloudItems:['Functions: HTTP, queue and timer triggers','Cosmos DB: the boxes','Service Bus: the nudge notes','Key Vault: GitHub secrets'],
+    chips:['Deploy: 1 Function app','Cosmos DB','Service Bus','Key Vault']
+  };
+  CFG.aws={
+    aria:'The same mail route on AWS: API Gateway and a Receiver Lambda are the front door, DynamoDB items are the PO boxes, and a delayed SQS nudge is the bell.',
+    need:false,
+    cloud:{n2:['Front door','API Gateway + Lambda'],n5:['PO boxes','DynamoDB item per box'],n6:['Bell','SQS delayed nudge']},
+    cap1:'The letter reaches API Gateway, which passes it to the Receiver Lambda.',
+    cap4:'The Receiver saves one DynamoDB item for the box, with a dedup marker, in one transaction.',
+    cap5:'A nudge note goes on an SQS queue, delayed until the box is due. A sweep every minute re-sends lost notes.',
+    cloudTitle:'AWS gives',
+    cloudItems:['API Gateway: the front door','Lambda: Receiver, Processor, Sweep','DynamoDB: the boxes','SQS: delayed nudge notes','EventBridge Scheduler: the sweep','SSM Parameter Store: settings'],
+    chips:['Deploy: 3 Lambdas','API Gateway','DynamoDB','SQS + dead-letter queue','EventBridge','SSM']
+  };
+  ARCH.azure={
+    aria:'Azure deployment: a Receiver function saves to Cosmos DB and puts a nudge on a Service Bus queue. The queue triggers the Processor, which runs the engine and your callbacks. A timer Sweep re-nudges due boxes. Key Vault holds secrets.',
+    groups:[
+      {x:180,y:15,w:640,h:440,own:'ext',dash:1,t:'Azure resource group (Terraform)',r:'Receiver, Processor and Sweep are one Function app'},
+      {x:195,y:235,w:340,h:195,own:'cl',t:'Cosmos DB container',r:'the boxes'}
+    ],
+    boxes:[
+      {x:20,y:85,w:130,h:56,own:'ext',t:'Sender',s:'GitHub',bg:[1]},
+      {x:200,y:85,w:160,h:56,own:'ch',t:'Receiver',s:'HTTP trigger',bg:[2,3]},
+      {x:400,y:85,w:160,h:56,own:'cl',t:'Service Bus queue',s:'the nudge notes',bg:[5]},
+      {x:600,y:78,w:200,h:70,own:'ch',t:'Processor',s:'queue trigger · engine|your callbacks run here',bg:[6,7]},
+      {x:840,y:85,w:110,h:56,own:'ext',dash:1,t:'Courier',s:'not connected yet',bg:[]},
+      {x:210,y:270,w:310,h:50,own:'cl',t:'Mailbox item',s:'one per box · version checked on write',bg:[3,4]},
+      {x:210,y:335,w:310,h:50,own:'cl',t:'Dedup markers',s:'one per provider event',bg:[3]},
+      {x:600,y:270,w:200,h:56,own:'cl',t:'Sweep',s:'timer · every minute',bg:[5]},
+      {x:600,y:350,w:200,h:56,own:'cl',t:'Key Vault',s:'5 GitHub secrets',bg:[]}
+    ],
+    arrows:[
+      {d:'M150,113 L200,113'},
+      {d:'M360,113 L400,113',l:'nudge',lx:380,ly:105},
+      {d:'M560,113 L600,113',l:'trigger',lx:580,ly:105},
+      {d:'M280,141 L280,270',l:'save + dedup',lx:335,ly:215},
+      {d:'M700,148 L700,215 L440,215 L440,270',both:1,l:'read · write',lx:570,ly:208},
+      {d:'M600,298 L520,298',l:'due?',lx:560,ly:290},
+      {d:'M640,270 L640,245 L540,245 L540,141',l:'re-nudge',lx:590,ly:238}
+    ]
+  };
+  ARCH.aws={
+    aria:'AWS deployment: API Gateway passes the webhook to a Receiver Lambda, which saves to DynamoDB and puts a delayed nudge on an SQS queue. The queue triggers the Processor Lambda, which runs the engine and your callbacks. An EventBridge Sweep re-nudges due boxes. SSM holds settings.',
+    groups:[
+      {x:180,y:15,w:620,h:440,own:'ext',dash:1,t:'AWS account (Terraform)',r:'region ap-southeast-1 by default'},
+      {x:195,y:235,w:340,h:195,own:'cl',t:'DynamoDB table',r:'the boxes'}
+    ],
+    boxes:[
+      {x:20,y:85,w:130,h:56,own:'ext',t:'Sender',s:'GitHub',bg:[]},
+      {x:195,y:85,w:130,h:56,own:'cl',t:'API Gateway',s:'HTTP API · 1 route',bg:[1]},
+      {x:345,y:85,w:130,h:56,own:'ch',t:'Receiver',s:'Lambda · verify · save',bg:[2,3]},
+      {x:495,y:85,w:130,h:56,own:'cl',t:'SQS queue',s:'delayed nudge notes',bg:[5]},
+      {x:645,y:78,w:140,h:70,own:'ch',t:'Processor',s:'Lambda · engine|your callbacks',bg:[6,7]},
+      {x:210,y:270,w:310,h:50,own:'cl',t:'Mailbox item',s:'one per issue or PR',bg:[3,4]},
+      {x:210,y:335,w:310,h:50,own:'cl',t:'Dedup markers',s:'written in the same transaction',bg:[3]},
+      {x:560,y:270,w:225,h:56,own:'cl',t:'Sweep',s:'Lambda · EventBridge, every minute',bg:[5]},
+      {x:560,y:350,w:225,h:56,own:'cl',t:'SSM Parameter Store',s:'5 GitHub settings',bg:[]}
+    ],
+    arrows:[
+      {d:'M150,113 L195,113'},
+      {d:'M325,113 L345,113'},
+      {d:'M475,113 L495,113'},
+      {d:'M625,113 L645,113'},
+      {d:'M410,141 L410,270',l:'save + dedup',lx:350,ly:215},
+      {d:'M715,148 L715,215 L480,215 L480,270',both:1,l:'read · write',lx:600,ly:208},
+      {d:'M560,298 L520,298',l:'due?',lx:540,ly:290},
+      {d:'M590,270 L590,141',l:'re-nudge',lx:628,ly:258}
+    ]
+  };
+  ARCH.split={
+    vb:'0 0 900 420',
+    aria:'Three layers. effect-channels decides the rules: key, save, dedupe and claim, order and bundle, due time and repair, delivery API. The platform must promise three things: send a key to one place, an all-or-nothing durable write, and a durable wake-up per box. Cloudflare, Azure and AWS each keep those promises with different parts.',
+    cap:'Teal is the library, grey is the promise the platform must keep, orange is the product that keeps it. Numbers are the eight requirements below.',
+    groups:[
+      {x:20,y:15,w:860,h:120,own:'ch',t:'effect-channels decides the rules'},
+      {x:20,y:175,w:860,h:90,own:'ext',dash:1,t:'The platform must promise'},
+      {x:20,y:295,w:860,h:115,own:'cl',t:'Platforms that keep the promises'}
+    ],
+    boxes:[
+      {x:30,y:50,w:130,h:60,own:'ch',t:'Work out the key',s:'from the event',bg:[1]},
+      {x:170,y:50,w:130,h:60,own:'ch',t:'Save, then 2xx',s:'before the receipt',bg:[2]},
+      {x:310,y:50,w:130,h:60,own:'ch',t:'Dedupe + claim',s:'same write, lease',bg:[3,4]},
+      {x:450,y:50,w:130,h:60,own:'ch',t:'Order + bundle',s:'sequence, retry batch',bg:[5]},
+      {x:590,y:50,w:130,h:60,own:'ch',t:'Due time + repair',s:'next-due, re-arm',bg:[6,7]},
+      {x:730,y:50,w:130,h:60,own:'ch',t:'Delivery API',s:'results come back',bg:[8]},
+      {x:30,y:205,w:250,h:50,own:'ext',t:'Send a key to one place',s:'the same place every time',bg:[1,8]},
+      {x:300,y:205,w:280,h:50,own:'ext',t:'All-or-nothing durable write',s:'survives a crash',bg:[2,3,4]},
+      {x:600,y:205,w:270,h:50,own:'ext',t:'A durable wake-up per box',s:'at a given time',bg:[6,7]},
+      {x:30,y:330,w:270,h:65,own:'cl',t:'Cloudflare',s:'Durable Object: name · storage · alarm'},
+      {x:315,y:330,w:270,h:65,own:'cl',t:'Azure (untested)',s:'Cosmos item · batch · Service Bus + sweep'},
+      {x:600,y:330,w:270,h:65,own:'cl',t:'AWS (untested)',s:'DynamoDB · transaction · SQS + sweep'}
+    ],
+    arrows:[
+      {d:'M450,135 L450,175',l:'relies on',lx:490,ly:160},
+      {d:'M165,265 L165,330'},
+      {d:'M450,265 L450,330'},
+      {d:'M735,265 L735,330'}
+    ]
+  };
+  ARCH.actor={
+    vb:'0 0 900 290',
+    aria:'An actor as a mailbox. A sender reaches the mailbox key, which names one mailbox record. The record holds waiting events, seen event keys, a claim with a lease, a frozen bundle and a next due time. The bundle goes to your callback, and a result returns to the record.',
+    cap:'This is a logical ownership model, not necessarily a running actor. Accepted events and delivery state persist; seen-event markers may be stored separately.',
+    groups:[
+      {x:340,y:20,w:360,h:250,own:'ch',t:'Mailbox state + related records',r:'logical conversation state'}
+    ],
+    boxes:[
+      {x:20,y:110,w:130,h:56,own:'ext',t:'Sender',s:'GitHub, Slack'},
+      {x:190,y:110,w:120,h:56,own:'ch',t:'Mailbox key',s:'issue 57',bg:[1]},
+      {x:355,y:55,w:160,h:50,own:'ch',t:'Waiting events',s:'saved, numbered',bg:[2]},
+      {x:530,y:55,w:155,h:50,own:'ch',t:'Seen event keys',s:'repeats are skipped',bg:[3]},
+      {x:355,y:125,w:160,h:50,own:'ch',t:'Claim + lease',s:'current claim + lease',bg:[4]},
+      {x:530,y:125,w:155,h:50,own:'ch',t:'Frozen bundle',s:'retried as it is',bg:[5]},
+      {x:355,y:195,w:330,h:50,own:'ch',t:'Next due time',s:'callback, output, retry or timeout',bg:[6,7]},
+      {x:750,y:110,w:130,h:56,own:'you',t:'Your callback',s:'reads the bundle'}
+    ],
+    arrows:[
+      {d:'M150,138 L190,138'},
+      {d:'M310,138 L340,138'},
+      {d:'M700,138 L750,138',l:'bundle',lx:725,ly:130},
+      {d:'M815,166 L815,235 L700,235',dash:1,l:'result returns',lx:758,ly:228}
+    ]
+  };
+  ARCH.life={
+    vb:'0 0 900 380',
+    aria:'Life of one box. A new letter is saved and deduped into Waiting. A wake-up moves the box to Claimed, then Bundle frozen, then Callback running, then Done. If the callback fails, the lease ends and the same bundle is run again. The callback can hand off to a courier, whose result returns to Waiting as a new message. A sweep re-arms a lost wake-up.',
+    cap:'Solid arrows are the normal path. Dashed arrows are repair and return paths.',
+    groups:[],
+    boxes:[
+      {x:20,y:30,w:130,h:50,own:'ext',t:'New letter',s:'webhook'},
+      {x:210,y:30,w:130,h:50,own:'cl',t:'Wake-up',s:'at the due time',bg:[6]},
+      {x:400,y:30,w:170,h:50,own:'cl',t:'Sweep or re-arm',s:'if due, no wake-up',bg:[7]},
+      {x:20,y:140,w:130,h:56,own:'ch',t:'Waiting',s:'saved, numbered',bg:[2,3]},
+      {x:210,y:140,w:130,h:56,own:'ch',t:'Claimed',s:'claim id + lease',bg:[4]},
+      {x:400,y:140,w:130,h:56,own:'ch',t:'Bundle frozen',s:'fixed, in order',bg:[5]},
+      {x:590,y:140,w:130,h:56,own:'you',t:'Callback running',s:'your code'},
+      {x:780,y:140,w:100,h:56,own:'ch',t:'Done',s:'events cleared'},
+      {x:640,y:300,w:130,h:56,own:'you',t:'Courier',s:'remote worker',bg:[8]}
+    ],
+    arrows:[
+      {d:'M85,80 L85,140',l:'save + dedupe',lx:160,ly:115},
+      {d:'M275,80 L275,140'},
+      {d:'M400,55 L340,55',dash:1},
+      {d:'M150,168 L210,168'},
+      {d:'M340,168 L400,168'},
+      {d:'M530,168 L590,168'},
+      {d:'M720,168 L780,168'},
+      {d:'M655,196 L655,250 L465,250 L465,196',dash:1,l:'lease ends, same bundle again',lx:560,ly:242},
+      {d:'M700,196 L700,300',l:'hand off',lx:735,ly:250},
+      {d:'M640,328 L85,328 L85,196',dash:1,l:'result is a new message',lx:362,ly:320}
+    ]
+  };
+  ARCH['do']={
+    vb:'0 0 900 330',
+    aria:'Three Worker requests run on any machine. Requests A and B both reach the Durable Object for box 57 by its name. Request C reaches the separate object for box 12. Each object has its own engine, storage and alarm. Cloudflare keeps the alarm time and rings box 57.',
+    cap:'Requests A and B are different Worker runs, maybe on different machines, and both reach the same box. The alarm wakes that object, not a request.',
+    groups:[
+      {x:330,y:25,w:340,h:145,own:'cl',t:'Durable Object: box 57',r:'one instance for this name'},
+      {x:330,y:200,w:340,h:100,own:'cl',t:'Durable Object: box 12'}
+    ],
+    boxes:[
+      {x:20,y:40,w:190,h:50,own:'cl',t:'Worker request A',s:'issue 57 webhook',bg:[]},
+      {x:20,y:105,w:190,h:50,own:'cl',t:'Worker request B',s:'courier update, issue 57',bg:[]},
+      {x:20,y:225,w:190,h:50,own:'cl',t:'Worker request C',s:'issue 12 webhook',bg:[]},
+      {x:345,y:60,w:150,h:44,own:'ch',t:'Engine + callbacks',s:'runs here',bg:[]},
+      {x:510,y:60,w:145,h:44,own:'cl',t:'Storage',s:'the notebook',bg:[]},
+      {x:345,y:112,w:150,h:44,own:'cl',t:'Alarm',s:'wake me at readyAt',bg:[]},
+      {x:345,y:235,w:150,h:44,own:'ch',t:'Engine + callbacks',s:'runs here',bg:[]},
+      {x:510,y:235,w:145,h:44,own:'cl',t:'Storage + alarm',s:'its own notebook',bg:[]},
+      {x:730,y:107,w:150,h:50,own:'ext',t:'Cloudflare clock',s:'holds the alarm time',bg:[]}
+    ],
+    arrows:[
+      {d:'M210,65 L330,65',l:'getByName',lx:270,ly:57},
+      {d:'M210,130 L330,130',l:'getByName',lx:270,ly:122},
+      {d:'M210,250 L330,250',l:'getByName',lx:270,ly:242},
+      {d:'M730,132 L495,132',l:'rings at readyAt',lx:612,ly:124}
+    ]
+  };
+  CFG.cloudflare.nodes={n9:['AgentSession','our echo task, separate DO','you']};
+  CFG.cloudflare.caps={8:'Your callback starts the echo task in the AgentSession DO and hands off the active delivery.',9:'The echo task calls the delivery API through the Worker service binding; its result updates the active delivery.'};
+  ['azure','aws'].forEach(function(name){
+    CFG[name].nodes={n9:['Echo agent','inside the Processor','you'],n10:['Tracking desk','in-process delivery API','ch']};
+    CFG[name].caps={8:'Your callback starts the echo task in the same Processor invocation and hands off the delivery.',9:'The echo uses the delivery client inside this process. No remote HTTP delivery endpoint is wired here.'};
+  });
+  ARCH.life={
+    vb:'0 0 900 380',
+    aria:'Accepted events wait, are claimed as a fixed batch, and run a callback. The callback can hand off to an agent. Saved output is sent separately, then the delivery finishes. Retryable callback failures can retry the fixed batch; output failures retry only output.',
+    cap:'An agent result updates the active delivery. It does not re-enter the waiting inbox. Later accepted events wait until the current delivery finishes.',
+    groups:[],
+    boxes:[
+      {x:20,y:65,w:145,h:65,own:'ch',t:'Waiting events',s:'saved in arrival order'},
+      {x:205,y:65,w:145,h:65,own:'ch',t:'Claimed batch',s:'fixed events + lease'},
+      {x:390,y:65,w:145,h:65,own:'you',t:'Callback',s:'your code'},
+      {x:575,y:65,w:145,h:65,own:'ch',t:'Saved output',s:'send to the provider'},
+      {x:760,y:65,w:120,h:65,own:'ch',t:'Finished',s:'next turn may run'},
+      {x:390,y:260,w:145,h:65,own:'you',t:'Agent work',s:'handed-off delivery'},
+      {x:575,y:260,w:145,h:65,own:'ch',t:'Output retry',s:'callback stays done'}
+    ],
+    arrows:[
+      {d:'M165,97 L205,97',l:'due',lx:185,ly:85},
+      {d:'M350,97 L390,97'},
+      {d:'M535,97 L575,97'},
+      {d:'M720,97 L760,97',l:'settled',lx:740,ly:85},
+      {d:'M462,130 L462,260',l:'handoff',lx:500,ly:205},
+      {d:'M535,292 L550,292 L550,150 L647,150 L647,130',l:'result saved',lx:610,ly:170},
+      {d:'M420,65 L420,25 L277,25 L277,65',dash:1,l:'retryable callback failure',lx:300,ly:17},
+      {d:'M647,130 L647,260',dash:1,l:'send failed',lx:690,ly:225},
+      {d:'M720,292 L740,292 L740,45 L647,45 L647,65',dash:1}
+    ]
+  };
+  function renderArch(host,spec){
+    var fig=h('figure',null,null,host);
+    var svg=el('svg',{viewBox:spec.vb||'0 0 960 470',role:'img','aria-label':spec.aria},fig);
+    var mid='aa-'+Math.random().toString(36).slice(2,7);
+    var defs=el('defs',{},svg);
+    var mk=el('marker',{id:mid,viewBox:'0 0 10 10',refX:'9',refY:'5',markerWidth:'7',markerHeight:'7',orient:'auto-start-reverse'},defs);
+    el('path',{d:'M0,0 L10,5 L0,10 z',style:'fill:var(--ink)'},mk);
+    spec.groups.forEach(function(g){
+      el('rect',{x:g.x,y:g.y,width:g.w,height:g.h,rx:8,class:'grp own-'+g.own+(g.dash?' dashed':'')},svg);
+      var t=el('text',{x:g.x+14,y:g.y+20,class:'gt'},svg); t.textContent=g.t;
+      if(g.r){var r=el('text',{x:g.x+g.w-14,y:g.y+20,'text-anchor':'end',class:'gr'},svg); r.textContent=g.r;}
+    });
+    spec.arrows.forEach(function(a){
+      var at={d:a.d,class:'arr'+(a.dash?' dashed':''),'marker-end':'url(#'+mid+')'};
+      if(a.both){at['marker-start']='url(#'+mid+')';}
+      el('path',at,svg);
+      if(a.l){var lt=el('text',{x:a.lx,y:a.ly,'text-anchor':'middle',class:'alab'},svg); lt.textContent=a.l;}
+    });
+    spec.boxes.forEach(function(b){
+      el('rect',{x:b.x,y:b.y,width:b.w,height:b.h,rx:6,class:'abox own-'+b.own+(b.dash?' dashed':'')},svg);
+      var cx=b.x+b.w/2;
+      var tt=el('text',{x:cx,y:b.y+(b.h<=50?20:24),'text-anchor':'middle',class:'bt'},svg); tt.textContent=b.t;
+      b.s.split('|').forEach(function(line,i){
+        var st=el('text',{x:cx,y:b.y+(b.h<=50?37:42)+i*14,'text-anchor':'middle',class:'bs'},svg); st.textContent=line;
+      });
+      (b.bg||[]).forEach(function(n,i){
+        var bx=b.x+b.w-8-i*22, by=b.y;
+        el('circle',{cx:bx,cy:by,r:10,class:'bdg'},svg);
+        var bt=el('text',{x:bx,y:by+4,'text-anchor':'middle',class:'bdt'},svg); bt.textContent=String(n);
+      });
+    });
+    var cap=h('figcaption','cap',spec.cap||'Numbers on the boxes are the story chapters. Teal is effect-channels, orange is the cloud, blue is you.',fig);
+  }
+  [].slice.call(document.querySelectorAll('.arch')).forEach(function(host){renderArch(host,ARCH[host.getAttribute('data-arch')]);});
+
+  [].slice.call(document.querySelectorAll('.anim')).forEach(function(host){
+    build(host,CFG[host.getAttribute('data-cfg')]);
+    host.addEventListener('animstep',function(ev){
+      var items=host.parentNode.querySelectorAll('.story li');
+      for(var i=0;i<items.length;i++){items[i].classList.toggle('current',i===ev.detail-1);}
+    });
+  });
+
+  var tabs=[].slice.call(document.querySelectorAll('[data-tab]'));
+  function show(name){
+    if(!document.getElementById('panel-'+name)){name='why';}
+    tabs.forEach(function(t){
+      var on=t.getAttribute('data-tab')===name;
+      t.setAttribute('aria-selected',on?'true':'false'); t.tabIndex=on?0:-1;
+      var panel=document.getElementById('panel-'+t.getAttribute('data-tab')); panel.hidden=!on; if(!on){panel.querySelectorAll('.anim').forEach(function(a){a.dispatchEvent(new Event('panelhide'));});}
+    });
+  }
+  tabs.forEach(function(t){t.addEventListener('click',function(){var n=t.getAttribute('data-tab');show(n);try{location.hash=n;}catch(e){}});});
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1));});
+  show(location.hash.slice(1)||'why');
+})();
+</script>
+</body>
+</html>

@@ -4,6 +4,8 @@ These notes capture a discussion about `effect-channels` and how to use it for a
 
 | Doc | What it covers |
 |---|---|
+| [Channels explained simply](../effect-channels-anim.html) | A robot-helper story that explains Channels and Durable Objects |
+| [Conversation delivery specification](conversation-delivery-spec.md) | Delivery requirements, state, failure boundaries, and acceptance criteria |
 | [01-purpose-and-scope](01-purpose-and-scope.md) | Why this project exists, goals, non-goals |
 | [02-sdk-overview](02-sdk-overview.md) | What Channels is, what problem it solves, why Effect |
 | [03-user-requirements](03-user-requirements.md) | User requirements derived from the SDK, kept separate from implementation |

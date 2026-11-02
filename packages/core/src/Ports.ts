@@ -8,7 +8,7 @@ import { Context, type Effect } from 'effect'
 import type { AgentSessionMessage } from './AgentSessionMessage'
 
 /**
- * The agent sessions, addressed by the GitHub or Jira discussion's mailbox key. `send` starts the agent in the
+ * The agent sessions, addressed by the channel's unique identifier. `send` starts the agent in the
  * background and returns once the message is accepted; the agent finishes the delivery.
  */
 export class AgentSessions extends Context.Service<

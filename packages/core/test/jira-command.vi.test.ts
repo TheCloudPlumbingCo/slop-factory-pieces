@@ -1,7 +1,7 @@
 import { describe, it } from '@effect/vitest'
 import { Option } from 'effect'
 
-import { parseCommand } from '../src/JiraCommand'
+import { parseCommand } from '../src/channels/JiraCommand'
 
 describe('parseCommand', () => {
 	it('reads a bare /research as research with empty args', ({ expect }) => {

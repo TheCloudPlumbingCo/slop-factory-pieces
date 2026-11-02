@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A simple picture story about Channels, your robot, and Durable Objects.">
+<title>Who keeps track while your robot works?</title>
+<style>
+:root{color-scheme:light;--paper:#faf7ef;--ink:#253d35;--muted:#67736a;--line:#d8ded2;--teal:#137b68;--pale:#e7f0df;--orange:#bb6129;--blue:#426fb5;--white:#fffef9}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.55 system-ui,sans-serif}main{max-width:1040px;margin:auto;padding:30px 24px 55px}h1{font:clamp(33px,5vw,51px)/1.08 Georgia,serif;letter-spacing:-.035em;max-width:800px;margin:7px 0 16px}h2{font:29px/1.2 Georgia,serif;margin:0 0 12px}h3{font-size:17px;margin:0 0 6px}p{margin:0 0 13px}.eyebrow{color:var(--teal);font-size:11px;font-weight:750;letter-spacing:.14em;text-transform:uppercase}.opening{max-width:760px;font-size:20px;line-height:1.5}.opening strong{color:var(--teal)}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0;border-bottom:1px solid var(--line);padding-bottom:16px}button{font:inherit;cursor:pointer;border:1px solid var(--line);border-radius:9px;padding:9px 15px;color:var(--ink);background:var(--white)}button:hover{border-color:var(--teal)}button:disabled{opacity:.45;cursor:default}button.primary,.tabs [aria-selected=true]{background:var(--teal);color:white;border-color:var(--teal)}.tabs button{font-size:14px}.chapter-intro{font-size:18px;max-width:780px}.comparison{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin:18px 0}.card{background:var(--white);padding:17px 20px;border:1px solid var(--line);border-radius:11px}.card.good{border-left:4px solid var(--teal)}.card p{margin:0;font-size:16px}.scene{background:var(--white);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin:20px 0}.scene-note{padding:12px 20px 0;font-size:12px;color:var(--muted);margin:0}.svg-scroll{overflow-x:auto}.scene svg{display:block;width:100%;min-width:650px;height:auto}.scene svg text{font-family:system-ui,sans-serif}.room{fill:#fff3df;stroke:var(--orange);stroke-width:2;stroke-dasharray:8 5}.part{cursor:pointer;transition:opacity .2s}.part .outline{stroke-width:2.5}.part.selected .outline{stroke-width:5}.part.dim{opacity:.25}.part.active .halo{opacity:1}.halo{opacity:0;fill:var(--pale)}.name{font-size:19px;fill:var(--ink);font-weight:750}.small{font-size:13px;fill:var(--muted)}.tiny{font-size:11px;fill:var(--muted)}.track{stroke:var(--line);stroke-width:3;fill:none}.flow{stroke:var(--teal);stroke-width:4;fill:none;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .7s ease}.flow.done{stroke-dashoffset:0}.route.dim{opacity:.1}.route.selected .track{stroke:var(--blue);stroke-width:4}.route-label{font-size:12px;fill:var(--muted);paint-order:stroke;stroke:var(--white);stroke-width:5px}.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 20px;border-top:1px solid var(--line)}.controls button{font-size:13px}.counter{font-size:12px;color:var(--muted);margin-left:auto}.caption{background:var(--pale);padding:18px 21px;min-height:119px}.caption h3{font-size:19px}.caption p{margin:4px 0 0;font-size:16px}.notebook-line{font-size:13px!important;color:var(--teal)}.inspect{padding:12px 20px;font-size:13px;border-top:1px solid var(--line);color:var(--muted);margin:0}.takeaway{border-left:4px solid var(--orange);padding:12px 18px;margin:20px 0;background:#fff0da;border-radius:0 9px 9px 0}.roles{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}.roles .card{padding:16px}.roles p{font-size:15px}.roles strong{display:block;margin-bottom:7px}.next-row{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);margin-top:25px;padding-top:20px}.next-row button{font-size:14px}.optional{margin-top:22px}details{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:10px;font-size:15px}summary{cursor:pointer;font-weight:650}details p{margin:12px 0 0}details ul{padding-left:21px}details li{margin:10px 0}a{color:var(--teal);text-underline-offset:3px}footer{font-size:12px;color:var(--muted);margin-top:24px}.table-wrap{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:14px;margin-top:12px}th,td{text-align:left;border-bottom:1px solid var(--line);padding:10px 7px;vertical-align:top}th{font-size:12px;color:var(--muted)}[hidden]{display:none!important}:focus-visible{outline:3px solid var(--blue);outline-offset:4px}@media(max-width:650px){main{padding:24px 15px 40px}.opening{font-size:18px}.comparison,.roles{grid-template-columns:1fr}.tabs{gap:5px}.tabs button{font-size:12px;padding:8px}.caption{min-height:145px}.counter{margin-left:0}.scene-note,.controls,.caption,.inspect{padding-left:14px;padding-right:14px}.next-row button{max-width:48%}}@media(prefers-reduced-motion:reduce){.flow,.part{transition:none}}@media print{.tabs,.controls,.next-row{display:none}.scene svg{min-width:0}section[hidden]{display:block!important}body{font-size:12px}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<div class="eyebrow">One story. Three different jobs.</div>
+<h1>Who keeps track while your robot works?</h1>
+<p class="opening">Your robot does the task. <strong>Channels keeps track of the messages.</strong> Durable Objects give that helper a room, a saved notebook, and an alarm clock.</p>
+</header>
+<nav class="tabs" role="tablist" aria-label="Story chapters">
+<button type="button" role="tab" id="tab-problem" aria-controls="chapter-problem" aria-selected="true" data-chapter="problem">1 · Why bother?</button>
+<button type="button" role="tab" id="tab-story" aria-controls="chapter-story" aria-selected="false" tabindex="-1" data-chapter="story">2 · Watch the helper</button>
+<button type="button" role="tab" id="tab-room" aria-controls="chapter-room" aria-selected="false" tabindex="-1" data-chapter="room">3 · What the room gives</button>
+<button type="button" role="tab" id="tab-together" aria-controls="chapter-together" aria-selected="false" tabindex="-1" data-chapter="together">4 · Put it together</button>
+</nav>
+<section role="tabpanel" id="chapter-problem" aria-labelledby="tab-problem">
+<h2>A good robot can still lose track.</h2>
+<p class="chapter-intro">Maya asks the school robot, “Find our science notes.” Easy! But messages and computers do not always behave.</p>
+<div class="comparison">
+<div class="card"><h3>Without Channels</h3><p>You write all the rules yourself. Was this message seen? Is the robot busy? Did its answer reach Maya?</p></div>
+<div class="card good"><h3>With Channels</h3><p>A message helper follows those rules for you. You can focus on what your robot should do.</p></div>
+</div>
+<p>Step through the pictures. Each arrow shows something the helper must handle.</p>
+</section>
+<section role="tabpanel" id="chapter-story" aria-labelledby="tab-story" hidden>
+<h2>The helper writes things down.</h2>
+<p class="chapter-intro">The helper saves Maya’s request, starts the robot, and keeps track until it handles the answer.</p>
+<p>The notebook remembers messages. It does not contain the robot’s whole brain.</p>
+</section>
+<section role="tabpanel" id="chapter-room" aria-labelledby="tab-room" hidden>
+<h2>The room has tools. The helper has rules.</h2>
+<p class="chapter-intro">Cloudflare calls this room a <strong>Durable Object</strong>. It gives your code three useful tools.</p>
+<p>A room, notebook, and clock cannot decide what to do with Maya’s messages. Channels supplies those decisions.</p>
+</section>
+<section role="tabpanel" id="chapter-together" aria-labelledby="tab-together" hidden>
+<h2>Keep these three jobs separate.</h2>
+<div class="roles">
+<div class="card"><strong>The room supplies tools.</strong><p>A place to send messages. Saved notes. A way to wake up later.</p></div>
+<div class="card good"><strong>Channels follows message rules.</strong><p>Spot repeats. Hold waiting messages. Retry unfinished steps. Send saved answers.</p></div>
+<div class="card"><strong>Your robot does the task.</strong><p>Read the notes. Solve the problem. Decide what answer to give.</p></div>
+</div>
+<p>You could write the helper yourself. Channels saves you from rebuilding its message-handling rules.</p>
+</section>
+<figure class="scene">
+<p class="scene-note">Click a picture to see its job. On a phone, slide the picture sideways.</p>
+<div class="svg-scroll" tabindex="0" aria-label="Scrollable story picture">
+<svg viewBox="0 0 1040 490" role="group" aria-label="Maya’s chat, a message helper inside a room, a saved notebook, an alarm clock, and your robot">
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="var(--teal)"/></marker></defs>
+<g id="part-room" class="part" role="button" tabindex="0" aria-label="The room: a Durable Object" aria-pressed="false">
+<rect class="room outline" x="315" y="35" width="430" height="405" rx="20"/>
+<text x="530" y="64" text-anchor="middle" class="small">THE ROOM · A DURABLE OBJECT</text>
+</g>
+<g class="route" data-edge="ask"><path class="track" d="M235 205 H435"/><path class="flow" pathLength="1" d="M235 205 H435"/><text class="route-label" x="330" y="193" text-anchor="middle">a message</text></g>
+<g class="route" data-edge="save"><path class="track" d="M485 250 V310 H435"/><path class="flow" pathLength="1" d="M485 250 V310 H435"/><text class="route-label" x="430" y="285" text-anchor="middle">write it down</text></g>
+<g class="route" data-edge="job"><path class="track" d="M615 205 H825"/><path class="flow" pathLength="1" d="M615 205 H825"/><text class="route-label" x="720" y="193" text-anchor="middle">start the task</text></g>
+<g class="route" data-edge="answer"><path class="track" d="M900 135 V95 H565 V150"/><path class="flow" pathLength="1" d="M900 135 V95 H565 V150"/><text class="route-label" x="740" y="84" text-anchor="middle">the robot’s answer</text></g>
+<g class="route" data-edge="reply"><path class="track" d="M445 240 H285 V285 H185 V250"/><path class="flow" pathLength="1" d="M445 240 H285 V285 H185 V250"/><text class="route-label" x="315" y="270" text-anchor="middle">send the answer</text></g>
+<g class="route" data-edge="wake"><path class="track" d="M660 330 V280 H575 V250"/><path class="flow" pathLength="1" d="M660 330 V280 H575 V250"/><text class="route-label" x="655" y="270" text-anchor="middle">wake up later</text></g>
+<g class="route" data-edge="read"><path class="track" d="M395 330 H365 V170 H435"/><path class="flow" pathLength="1" d="M395 330 H365 V170 H435"/><text class="route-label" x="366" y="155" text-anchor="middle">check the notes</text></g>
+<g id="part-chat" class="part" role="button" tabindex="0" aria-label="Maya’s chat" aria-pressed="false">
+<circle class="halo" cx="150" cy="200" r="93"/>
+<rect class="outline" x="60" y="140" width="175" height="110" rx="17" fill="#eef3ff" stroke="var(--blue)"/>
+<path d="M96 250 L83 268 L124 250" fill="#eef3ff" stroke="var(--blue)" stroke-width="2.5"/>
+<text x="148" y="173" text-anchor="middle" class="small">Maya asks:</text>
+<text x="148" y="198" text-anchor="middle" class="name">“Find our</text><text x="148" y="222" text-anchor="middle" class="name">science notes.”</text>
+<text x="148" y="314" text-anchor="middle" class="name">The chat</text>
+</g>
+<g id="part-helper" class="part" role="button" tabindex="0" aria-label="The message helper: Channels" aria-pressed="false">
+<circle class="halo" cx="525" cy="203" r="91"/>
+<rect class="outline" x="435" y="150" width="180" height="100" rx="15" fill="#eff5e8" stroke="var(--teal)"/>
+<circle cx="525" cy="177" r="14" fill="#f5d3a5" stroke="var(--ink)" stroke-width="2"/>
+<path d="M505 209 Q525 185 545 209" fill="var(--teal)"/>
+<path d="M458 220 H592" stroke="var(--ink)" stroke-width="3"/>
+<rect x="470" y="210" width="22" height="14" rx="2" fill="white" stroke="var(--ink)" stroke-width="1.5"/>
+<text x="525" y="235" text-anchor="middle" class="small">keeps track of messages</text>
+<text x="525" y="127" text-anchor="middle" class="name">Channels, the helper</text>
+</g>
+<g id="part-notebook" class="part" role="button" tabindex="0" aria-label="The saved notebook" aria-pressed="false">
+<circle class="halo" cx="426" cy="359" r="64"/>
+<rect class="outline" x="395" y="323" width="64" height="72" rx="5" fill="#fff" stroke="var(--orange)"/>
+<path d="M407 323 V395 M418 340 H447 M418 354 H447 M418 368 H440" stroke="var(--orange)" stroke-width="2"/>
+<text x="426" y="420" text-anchor="middle" class="name">Saved notebook</text>
+</g>
+<g id="part-clock" class="part" role="button" tabindex="0" aria-label="The alarm clock" aria-pressed="false">
+<circle class="halo" cx="660" cy="359" r="65"/>
+<circle class="outline" cx="660" cy="360" r="33" fill="#fff" stroke="var(--orange)"/>
+<path d="M660 338 V360 L677 371 M636 326 L624 337 M684 326 L696 337 M640 386 L635 395 M680 386 L685 395" stroke="var(--orange)" stroke-width="3" fill="none" stroke-linecap="round"/>
+<text x="660" y="420" text-anchor="middle" class="name">Alarm clock</text>
+</g>
+<g id="part-robot" class="part" role="button" tabindex="0" aria-label="Your robot: the agent" aria-pressed="false">
+<circle class="halo" cx="900" cy="205" r="87"/>
+<path d="M900 135 V119" stroke="var(--blue)" stroke-width="3"/><circle cx="900" cy="114" r="6" fill="var(--orange)"/>
+<rect class="outline" x="845" y="135" width="110" height="76" rx="13" fill="#eaf0fc" stroke="var(--blue)"/>
+<circle cx="877" cy="168" r="7" fill="var(--ink)"/><circle cx="923" cy="168" r="7" fill="var(--ink)"/>
+<path d="M878 190 H922" stroke="var(--blue)" stroke-width="3"/>
+<rect x="858" y="214" width="84" height="44" rx="10" fill="#eaf0fc" stroke="var(--blue)" stroke-width="2.5"/>
+<path d="M845 225 L825 241 M955 225 L975 241 M876 258 V272 M924 258 V272" stroke="var(--blue)" stroke-width="4" stroke-linecap="round"/>
+<text x="900" y="314" text-anchor="middle" class="name">Your robot</text><text x="900" y="337" text-anchor="middle" class="small">does the actual task</text>
+</g>
+</svg>
+</div>
+<div class="controls">
+<button type="button" id="play" class="primary">Play</button><button type="button" id="pause" disabled>Pause</button><button type="button" id="step">Step</button><button type="button" id="reset">Reset</button><span class="counter" id="counter">0 / 4</span>
+</div>
+<figcaption class="caption" aria-live="polite" aria-atomic="true"><h3 id="step-title">First, see what can go wrong.</h3><p id="step-text">Press Step to follow Maya’s message.</p><p class="notebook-line" id="notebook-status"></p></figcaption>
+<p class="inspect" id="inspect" aria-live="polite">Click a picture to learn what it does.</p>
+</figure>
+<div class="takeaway" id="takeaway"></div>
+<div id="last-extras" hidden>
+<p>If the robot stops halfway, its own program must know how to continue. The notebook cannot do that thinking.</p>
+<p>Trying again can also repeat an action. Channels reduces mistakes; it does not make every reply happen exactly once.</p>
+<div class="optional">
+<details id="real-names"><summary>Only if you want the real names</summary>
+<ul>
+<li><strong>Reactive programming:</strong> write code that responds when something arrives or changes.</li>
+<li><strong>Akka:</strong> build software helpers that send each other messages. You still choose their rules and saved memory.</li>
+<li><strong>Durable Object:</strong> Cloudflare supplies the room, saved notebook, and alarm. Your code chooses what to put in them.</li>
+<li><strong>Channels:</strong> ready-made rules for handling conversation messages. It can use Durable Objects or other storage.</li>
+<li><strong>Agent:</strong> the robot program that performs your task.</li>
+</ul>
+<p>These names describe different jobs. They are not four names for the same thing.</p>
+</details>
+<details id="cloud-names"><summary>Where do Cloudflare, AWS, and Azure fit?</summary>
+<p>They provide places to run your programs and save your notes.</p>
+<div class="table-wrap"><table><thead><tr><th>Place</th><th>How our project builds the helper’s workplace</th></tr></thead><tbody>
+<tr><td>Cloudflare</td><td>Durable Objects bring the room, notebook, and alarm together.</td></tr>
+<tr><td>AWS</td><td>A database saves notes. Worker programs do steps. A queue and a timer wake them.</td></tr>
+<tr><td>Azure</td><td>It combines the same kinds of parts. Our research robot can run in GitHub Actions.</td></tr>
+<tr><td>Your own server</td><td>You can run Channels with a database and a program that checks for waiting work.</td></tr>
+</tbody></table></div>
+<p>The tools change. The helper still needs rules for the same message problems.</p>
+</details>
+<details><summary>A small accuracy note</summary>
+<p>The room is a picture, not a computer that runs forever. Cloudflare can stop and restart its code.</p>
+<p>Saved notebook entries remain after a restart. Ordinary notes kept only in the program’s memory do not.</p>
+<p>Akka handles one message at a time, but a task can continue after that message handler finishes.</p>
+<p>A Durable Object can also handle another request while it waits for outside work.</p>
+<p>That is why Channels keeps an explicit record of which conversation work is still active.</p>
+<p><a href="https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/">Durable Objects</a> · <a href="https://doc.akka.io/libraries/akka-core/current/typed/actors.html">Akka</a> · <a href="https://www.reactive-streams.org/">Reactive Streams</a></p>
+</details>
+</div>
+</div>
+<div class="next-row"><button type="button" id="previous" disabled>← Back</button><button type="button" id="next" class="primary">Watch the helper →</button></div>
+<footer>This picture story runs offline. It does not start a real robot or contact a cloud service.</footer>
+</main>
+<script>
+(()=>{'use strict';
+const chapters=[
+{id:'problem',intro:['First, see what can go wrong.','Press Step to follow Maya’s message.'],take:'The hard part is not reading one message. It is remembering what still needs to happen.',steps:[
+['ask','The same message arrives twice.','Without a seen-message note, your program might start two copies of the task.','The helper needs to remember: “I have already seen this.”',['chat','helper']],
+['save','Another message arrives while the robot works.','The helper saves it to handle later. It does not forget the message just because the robot is busy.','Notebook: another message is waiting.',['helper','notebook','robot']],
+['answer','The robot finishes, but the chat is unavailable.','Doing the task again would waste work. The helper needs to save the answer and try sending it later.','Notebook: the answer still needs to reach Maya.',['robot','helper','notebook']],
+['wake','The computer restarts.','The helper checks its saved notes to find unfinished steps. Your robot still needs its own restart plan.','Saved notes survive. The robot’s unfinished thinking is a separate problem.',['clock','helper','notebook']]
+]},
+{id:'story',intro:['One request, from start to answer.','Press Step. The helper will keep a note of each important change.'],take:'Channels manages the messages around the robot. Your robot still does the actual job.',steps:[
+['ask','Maya asks for the science notes.','The chat sends her request to the message helper.','Maya’s request has arrived.',['chat','helper']],
+['save','The helper saves the request.','It also remembers which message it has seen, so a repeated copy does not become a new request.','Notebook: request saved.',['helper','notebook']],
+['job','The helper starts your robot.','Your robot looks for the science notes. Later messages can wait in the saved notebook.','Notebook: this task is active.',['helper','robot','notebook']],
+['answer','The robot returns an answer.','The helper saves the answer before trying to send it to Maya.','Notebook: answer ready to send.',['robot','helper','notebook']],
+['reply','The chat cannot take the answer yet.','The first sending attempt fails. The helper keeps the saved answer instead of asking the robot to do everything again.','Notebook: answer still waiting to reach Maya.',['helper','chat','notebook']],
+['wake','The alarm rings later.','The helper wakes up and checks the saved answer. The robot does not need to repeat its task.','Notebook: send this saved answer again.',['clock','helper','notebook']],
+['reply','The helper tries the same answer again.','This time, the chat accepts it. Maya gets her answer, and the helper can handle waiting work.','Notebook: this conversation turn can finish.',['helper','chat']]
+]},
+{id:'room',intro:['What comes with the room?','Press Step to inspect the room’s tools.'],take:'Durable Objects provide the tools. Channels uses them to follow message-handling rules.',steps:[
+['ask','An address for one room.','Messages for the same conversation can reach the same place. Your code chooses the room’s name.','Tool: a named place to send messages.',['room','chat','helper']],
+['save','A notebook that keeps saved entries.','The helper can write down requests, waiting messages, and answers. Those saved entries survive a code restart.','Tool: persistent storage.',['room','notebook']],
+['wake','An alarm to wake up later.','The helper can ask the clock to wake it for a later step, such as another sending attempt.','Tool: one scheduled alarm.',['room','clock','helper']],
+['read','But the room does not know the rules.','Channels says what counts as a repeat, what must wait, and which unfinished step to try next.','Rules: message handling, supplied by Channels.',['helper','notebook','clock']]
+]},
+{id:'together',intro:['Now put the jobs together.','The room supplies tools. The helper keeps track. The robot does the task.'],take:'A room with a notebook is useful. Channels adds the instructions for running your conversation helper.',steps:[
+['ask','The chat brings the request.','Maya’s message needs somewhere to go. The room gives it an address.','Room: receive messages for this conversation.',['chat','room']],
+['save','Channels keeps the record.','The helper uses the notebook to remember seen messages and unfinished steps.','Channels: follow the message rules.',['helper','notebook']],
+['job','Your robot does the work.','It reads the science notes and makes the answer. The room and helper do not replace that program.','Your code: perform the task.',['helper','robot']],
+['reply','Channels handles the reply.','It uses the saved answer to keep track of sending. If a temporary failure occurs, it can try again.','Channels: manage the answer’s journey back.',['helper','chat','notebook']]
+]}
+];
+const connections={ask:['chat','helper'],save:['helper','notebook'],job:['helper','robot'],answer:['robot','helper'],reply:['helper','chat'],wake:['clock','helper'],read:['notebook','helper']};
+const descriptions={room:'The room is a Durable Object. It supplies an address, saved storage, and an alarm. Channels supplies the rules.',chat:'Maya asks here and reads the answer here. Messages can repeat, and the chat can be temporarily unavailable.',helper:'Channels is the message helper. It keeps track of requests, waiting messages, and saved answers.',notebook:'This is persistent storage. Saved entries survive a restart. It does not save the robot’s thinking automatically.',clock:'The helper sets an alarm when it needs to wake up later. The clock does not choose the task.',robot:'Your agent program does the task. You choose what it does and how it resumes interrupted work.'};
+const routes=[...document.querySelectorAll('.route')],parts=[...document.querySelectorAll('.part')],tabs=[...document.querySelectorAll('[data-chapter]')];
+let chapter=0,pos=0,timer=null,selected=null;
+const $=id=>document.getElementById(id);
+function pause(){if(timer){clearInterval(timer);timer=null;}updateButtons();}
+function updateButtons(){$('play').disabled=!!timer;$('pause').disabled=!timer;$('step').disabled=pos>=chapters[chapter].steps.length;$('previous').disabled=chapter===0;$('next').disabled=chapter===chapters.length-1;}
+function highlight(){let related=new Set(selected?[selected]:[]);for(const route of routes){const ids=connections[route.dataset.edge],on=!!selected&&(selected==='room'?ids.some(id=>['helper','notebook','clock'].includes(id)):ids.includes(selected));route.classList.toggle('selected',on);route.classList.toggle('dim',!!selected&&!on);if(on)ids.forEach(id=>related.add(id));}if(selected==='room')['helper','notebook','clock'].forEach(id=>related.add(id));for(const part of parts){const id=part.id.slice(5);part.classList.toggle('selected',id===selected);part.classList.toggle('dim',!!selected&&!related.has(id));part.setAttribute('aria-pressed',String(id===selected));}$('inspect').textContent=selected?descriptions[selected]:'Click a picture to learn what it does.';}
+function render(){const c=chapters[chapter],step=c.steps[pos-1],done=new Set(c.steps.slice(0,pos).map(s=>s[0]));for(const route of routes){const path=route.querySelector('.flow'),on=done.has(route.dataset.edge);path.classList.toggle('done',on);if(on)path.setAttribute('marker-end','url(#arrow)');else path.removeAttribute('marker-end');}for(const part of parts)part.classList.toggle('active',!!step&&step[4].includes(part.id.slice(5)));$('step-title').textContent=step?step[1]:c.intro[0];$('step-text').textContent=step?step[2]:c.intro[1];$('notebook-status').textContent=step?step[3]:'';$('counter').textContent=pos+' / '+c.steps.length;$('takeaway').textContent=c.take;highlight();updateButtons();}
+function advance(){const c=chapters[chapter];if(pos>=c.steps.length){pause();return;}const route=routes.find(r=>r.dataset.edge===c.steps[pos][0]);route.querySelector('.flow').classList.remove('done');void route.getBoundingClientRect();pos++;render();if(pos===c.steps.length)pause();}
+function play(){if(timer)return;if(pos>=chapters[chapter].steps.length){pos=0;render();}timer=setInterval(advance,2400);advance();updateButtons();}
+function reset(){pause();pos=0;selected=null;render();}
+function show(id,focus=false){const aliases={'why':'problem','no-cloud':'story','requirements':'room','cloudflare':'room','azure':'together','aws':'together','reactive':'together','actors':'together','lifecycle':'story','spec':'together','evidence':'together'};const target=aliases[id]||id;let index=chapters.findIndex(c=>c.id===target);if(index<0)index=0;pause();chapter=index;pos=0;selected=null;tabs.forEach((tab,i)=>{const on=i===index;tab.setAttribute('aria-selected',String(on));tab.tabIndex=on?0:-1;$('chapter-'+tab.dataset.chapter).hidden=!on;});$('last-extras').hidden=index!==3;const names=['Why bother?','Watch the helper','See the room’s tools','Put it together'];$('next').textContent=(names[index+1]||'The end')+' →';if(['aws','azure'].includes(id))$('cloud-names').open=true;if(['actors','reactive'].includes(id))$('real-names').open=true;render();if(focus)tabs[index].focus();}
+function navigate(index,focus=false){index=Math.max(0,Math.min(chapters.length-1,index));const id=chapters[index].id;history.replaceState(null,'','#'+id);show(id,focus);}
+$('play').addEventListener('click',play);$('pause').addEventListener('click',pause);$('step').addEventListener('click',()=>{pause();advance();});$('reset').addEventListener('click',reset);$('previous').addEventListener('click',()=>navigate(chapter-1));$('next').addEventListener('click',()=>navigate(chapter+1));
+for(const part of parts){function select(){const id=part.id.slice(5);selected=selected===id?null:id;highlight();}part.addEventListener('click',select);part.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();select();}if(ev.key==='Escape'){selected=null;highlight();}});}
+tabs.forEach((tab,i)=>{tab.addEventListener('click',()=>navigate(i));tab.addEventListener('keydown',ev=>{let n;if(ev.key==='ArrowRight')n=(i+1)%tabs.length;if(ev.key==='ArrowLeft')n=(i-1+tabs.length)%tabs.length;if(ev.key==='Home')n=0;if(ev.key==='End')n=tabs.length-1;if(n!==undefined){ev.preventDefault();navigate(n,true);}});});
+addEventListener('hashchange',()=>show(location.hash.slice(1)));document.addEventListener('visibilitychange',()=>{if(document.hidden)pause();});show(location.hash.slice(1));
+})();
+</script>
+</body>
+</html>

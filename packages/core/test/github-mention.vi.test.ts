@@ -17,7 +17,7 @@ import {
 } from '@humanlayer/channels-github'
 import { ConfigProvider, Effect, Layer, Option, Ref } from 'effect'
 
-import { decideGitHubMention, maintainerOnlyNotice } from '../src/GithubMention'
+import { decideGitHubMention, maintainerOnlyNotice } from '../src/channels/GithubMention'
 
 const repository = {
 	installationId: GitHubId.make(100),

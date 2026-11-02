@@ -15,7 +15,7 @@ import {
 } from '@humanlayer/channels-github'
 import { Config, Effect, Match, Option, Predicate } from 'effect'
 
-import type { MentionRequest } from './AgentSessionMessage'
+import type { MentionRequest } from '../AgentSessionMessage'
 
 export const maintainerOnlyNotice =
 	'This agent can only be invoked by maintainers (users with write access or higher to this repository).'

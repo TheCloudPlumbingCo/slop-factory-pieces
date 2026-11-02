@@ -2,7 +2,7 @@ import { describe, it } from '@effect/vitest'
 import { JiraApi, JiraIssueId, JiraIssueRef, JiraMentioned } from '@humanlayer/channels-jira'
 import { Effect, Layer, Option, Ref } from 'effect'
 
-import { decideJiraMention, JIRA_ACK_MARKDOWN } from '../src/JiraMention'
+import { decideJiraMention, JIRA_ACK_MARKDOWN } from '../src/channels/JiraMention'
 
 const issue = JiraIssueRef.make({
 	id: JiraIssueId.make('10042'),

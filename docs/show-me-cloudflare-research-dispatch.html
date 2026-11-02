@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cloudflare research dispatch</title>
+<style>
+/* layout: one scrollable sequence diagram, then a changes tree and the trust rules */
+:root{--bg:#f6f7f9;--fg:#1b2430;--mut:#5d6b7c;--line:#cfd6df;--card:#fff;--cf:#c2410c;--gh:#1f6feb;--new:#1f7a4d;--font:system-ui,-apple-system,'Segoe UI',sans-serif;--mono:ui-monospace,Menlo,monospace}
+@media (prefers-color-scheme:dark){:root{--bg:#12161c;--fg:#e6eaf0;--mut:#93a0b1;--line:#2d3642;--card:#1a2029;--cf:#fb923c;--gh:#6ea8ff;--new:#4ade80;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 var(--font)}
+main{max-width:1000px;margin:0 auto;padding:28px 16px 64px;display:flex;flex-direction:column;gap:28px}
+h1{font-size:26px;margin:0 0 6px;text-wrap:balance}
+h2{font-size:17px;margin:0 0 10px}
+p{margin:0 0 8px;max-width:70ch}.mut{color:var(--mut)}
+.box{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-x:auto}
+svg{display:block;min-width:900px;font-family:var(--font)}
+svg text{fill:var(--fg);font-size:12px}
+.lane{stroke:var(--line);stroke-dasharray:4 4}
+.pt{fill:var(--card);stroke:var(--line)}
+.a{stroke:var(--fg);stroke-width:1.4;fill:none}
+.ret{stroke-dasharray:5 3}
+.n{fill:var(--new)!important;font-weight:600}
+.cf{stroke:var(--cf)}.ghc{stroke:var(--gh)}
+.band{fill:var(--gh);opacity:.08}
+pre{margin:0;font:13px/1.5 var(--mono);white-space:pre}
+.add{color:var(--new)}
+ul{margin:0;padding-left:20px}li{margin-bottom:6px}
+code{font-family:var(--mono);font-size:13px}
+</style></head><body><main>
+<header>
+<h1>Cloudflare research dispatch</h1>
+<p class="mut">The "remote worker" is a GitHub Actions job. It runs on the user's runner (their machine or GitHub's), in the user's repo. The broker on Cloudflare starts it, then the job reports back over HTTP.</p>
+</header>
+
+<section>
+<h2>One <code>/research</code> comment, end to end</h2>
+<div class="box">
+<svg viewBox="0 0 980 640" role="img" aria-label="Sequence diagram of a research comment">
+ <defs><marker id="h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="currentColor" style="color:var(--fg)"/></marker></defs>
+ <!-- user's runner band -->
+ <rect class="band" x="800" y="10" width="170" height="620" rx="8"/>
+ <text x="885" y="626" text-anchor="middle" class="mut" style="fill:var(--mut)">user's repo and runner</text>
+ <!-- lanes x: 60 GitHub, 230 Worker, 390 Mailbox DO, 540 AgentSession DO, 690 Pending DO, 885 Runner -->
+ <g class="lane"><line x1="70" y1="50" x2="70" y2="600"/><line x1="230" y1="50" x2="230" y2="600"/><line x1="390" y1="50" x2="390" y2="600"/><line x1="540" y1="50" x2="540" y2="600"/><line x1="690" y1="50" x2="690" y2="600"/><line x1="885" y1="50" x2="885" y2="600"/></g>
+ <g class="pt">
+  <rect x="20" y="16" width="100" height="32" rx="6"/><rect x="170" y="16" width="120" height="32" rx="6"/><rect x="330" y="16" width="120" height="32" rx="6"/><rect x="470" y="16" width="140" height="32" rx="6"/><rect x="630" y="16" width="120" height="32" rx="6"/><rect x="825" y="16" width="120" height="32" rx="6"/>
+ </g>
+ <text x="70" y="36" text-anchor="middle">GitHub</text><text x="230" y="36" text-anchor="middle">Ingress Worker</text><text x="390" y="36" text-anchor="middle">Mailbox DO</text><text x="540" y="36" text-anchor="middle">AgentSession DO</text><text x="690" y="36" text-anchor="middle" class="n">Pending DO (new)</text><text x="885" y="36" text-anchor="middle">Actions job</text>
+
+ <!-- 1 -->
+ <line class="a" x1="70" y1="86" x2="228" y2="86" marker-end="url(#h)"/><text x="78" y="78">1 webhook: "@bot /research why does CI fail?"</text>
+ <!-- 2 -->
+ <line class="a" x1="232" y1="120" x2="388" y2="120" marker-end="url(#h)"/><text x="240" y="112">2 verify, save event</text>
+ <!-- 3 -->
+ <line class="a" x1="392" y1="154" x2="538" y2="154" marker-end="url(#h)"/><text x="400" y="146">3 callback: handoff, send()</text>
+ <!-- 4 -->
+ <line class="a" x1="542" y1="196" x2="688" y2="196" marker-end="url(#h)"/><text x="548" y="188" class="n">4 save pending record</text>
+ <text x="548" y="212" style="fill:var(--mut)">deliveryId, repo id, task password, 15 min</text>
+ <!-- 5 -->
+ <line class="a" x1="538" y1="246" x2="72" y2="246" marker-end="url(#h)"/><text x="140" y="238" class="n">5 repository_dispatch as the GitHub App</text>
+ <text x="140" y="262" style="fill:var(--mut)">payload: task, issue, deliveryId, brokerOrigin. No password.</text>
+ <!-- 6 -->
+ <line class="a ghc" x1="72" y1="302" x2="883" y2="302" marker-end="url(#h)"/><text x="360" y="294">6 starts the workflow on the runner</text>
+ <!-- 7 -->
+ <text x="745" y="336" style="fill:var(--mut)">job asks GitHub for an OIDC token</text>
+ <line class="a cf" x1="883" y1="366" x2="232" y2="366" marker-end="url(#h)"/><text x="360" y="358" class="n">7 calls /research-session/{id}/skills | activity</text>
+ <text x="360" y="382" style="fill:var(--mut)">Authorization: Bearer OIDC token</text>
+ <!-- 8 -->
+ <path class="a" d="M236 408 h40 v28 h-40" marker-end="url(#h)"/><text x="284" y="428" class="n">8 verify signature, repo id, workflow ref</text>
+ <!-- 9 -->
+ <line class="a" x1="232" y1="474" x2="688" y2="474" marker-end="url(#h)"/><text x="300" y="466" class="n">9 read pending record</text>
+ <line class="a ret" x1="688" y1="492" x2="232" y2="492" marker-end="url(#h)"/>
+ <!-- 10 -->
+ <path class="a" d="M236 520 h40 v26 h-40" marker-end="url(#h)"/><text x="284" y="538">10 forward to delivery API with the task password</text>
+ <!-- 11 -->
+ <line class="a" x1="232" y1="580" x2="72" y2="580" marker-end="url(#h)"/><text x="80" y="572">11 on complete or fail: comment in the thread</text>
+</svg>
+</div>
+<p class="mut">Steps 7 to 10 repeat for each progress update. <code>complete</code> and <code>fail</code> finish the delivery and delete the pending record.</p>
+</section>
+
+<section>
+<h2>What changes in the folders</h2>
+<div class="box"><pre>packages/core/src/
+ ├── channels/
+<span class="add">+├── research/
++│   ├── ResearchAgentSessions.ts   # moved from infra/azure, shared by both clouds
++│   ├── OidcProxy.ts               # moved from infra/azure
++│   └── PendingResearch.ts         # store interface only</span>
+infra/cloudfare/src/
+ ├── AgentSessionDO.ts             # <span class="add">sends /research to the workflow, echo stays the fallback</span>
+ ├── Worker.ts                     # <span class="add">+ route /research-session/{id}/{action}</span>
+<span class="add">+├── PendingResearchDO.ts           # Durable Object: save, peek, take with expiry
++└── GithubDispatch.ts              # App JWT with WebCrypto, then repository_dispatch</span>
+infra/azure/src/
+<span class="add">~  imports the three shared files instead of keeping copies</span></pre></div>
+</section>
+
+<section>
+<h2>Why the job can be trusted without a password</h2>
+<div class="box"><ul>
+<li>The task password stays in the Pending DO. It is never in the dispatch payload, which GitHub stores, and never on the runner.</li>
+<li>The job proves who it is with a GitHub OIDC token. The Worker checks the signature, that its repository id equals the one saved at dispatch, and that its workflow is on an allowlist.</li>
+<li>Each refusal is the same bare 401. The record expires after 15 minutes if the job never reports.</li>
+</ul></div>
+</section>
+</main></body></html>

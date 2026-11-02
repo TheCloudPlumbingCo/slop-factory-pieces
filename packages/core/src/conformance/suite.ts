@@ -6,7 +6,7 @@ import { describe, expect, it } from '@effect/vitest'
 import { Effect, type Scope } from 'effect'
 
 import { echoReply } from '../EchoReply'
-import { maintainerOnlyNotice } from '../GithubMention'
+import { maintainerOnlyNotice } from '../channels/GithubMention'
 import { botMention, type ControlLayerDriver } from './driver'
 
 /** The debounce every deployment uses: a mention runs once its issue has been quiet for this long. */

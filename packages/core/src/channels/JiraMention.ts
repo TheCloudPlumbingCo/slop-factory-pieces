@@ -6,7 +6,7 @@
 import { JiraApi, type JiraIssueInfo, type JiraMentioned } from '@humanlayer/channels-jira'
 import { Effect, Option, Predicate } from 'effect'
 
-import type { MentionRequest } from './AgentSessionMessage'
+import type { MentionRequest } from '../AgentSessionMessage'
 import { parseCommand } from './JiraCommand'
 
 /**
