@@ -1,0 +1,596 @@
+<title>Portal SSO Reference Spec</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<style>
+/* Layout: single reading column, wide tables and diagrams scroll inside their own box. */
+:root {
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --fg: #16202e;
+  --muted: #55657a;
+  --line: #d6dde8;
+  --accent: #0b5cad;
+  --accent-soft: #e3eefb;
+  --built: #1b6b3a;
+  --built-soft: #e0f3e7;
+  --todo: #8a4b00;
+  --todo-soft: #fdeed6;
+  --risk: #a3262a;
+  --risk-soft: #fbe3e3;
+  --code-bg: #eef2f7;
+  --font-display: "IBM Plex Serif", Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1620; --surface: #151f2c; --fg: #e4eaf2; --muted: #9aaabd; --line: #28374a;
+    --accent: #6fb1f5; --accent-soft: #15293f;
+    --built: #67cf8d; --built-soft: #12301f;
+    --todo: #f1b868; --todo-soft: #35260f;
+    --risk: #f08a8d; --risk-soft: #3a1618;
+    --code-bg: #1a2635; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1620; --surface: #151f2c; --fg: #e4eaf2; --muted: #9aaabd; --line: #28374a;
+  --accent: #6fb1f5; --accent-soft: #15293f;
+  --built: #67cf8d; --built-soft: #12301f;
+  --todo: #f1b868; --todo-soft: #35260f;
+  --risk: #f08a8d; --risk-soft: #3a1618;
+  --code-bg: #1a2635; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+  padding-block: 32px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px; }
+section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+h1, h2, h3 { font-family: var(--font-display); line-height: 1.25; text-wrap: balance; margin: 0; }
+h1 { font-size: 2.1rem; font-weight: 600; }
+h2 { font-size: 1.5rem; font-weight: 600; padding-top: 8px; border-top: 1px solid var(--line); }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { margin: 0; max-width: 70ch; }
+ul, ol { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 6px; max-width: 72ch; }
+a { color: var(--accent); }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+pre { margin: 0; }
+.lede { font-size: 1.1rem; color: var(--muted); }
+.meta { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.toc { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px 24px; padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font-size: 0.92rem; }
+.toc a { text-decoration: none; padding: 2px 0; }
+.toc a:hover { text-decoration: underline; }
+.scroll { overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 640px; }
+th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+th { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); background: var(--code-bg); font-weight: 500; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 500; }
+.diagram { padding: 16px; overflow-x: auto; max-width: 100%; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.diagram pre.mermaid { display: flex; justify-content: center; min-width: 560px; }
+.figcap { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); margin-top: -6px; }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 7px; border-radius: 3px; white-space: nowrap; font-weight: 500; vertical-align: 1px; }
+.chip.built { background: var(--built-soft); color: var(--built); }
+.chip.todo { background: var(--todo-soft); color: var(--todo); }
+.chip.risk { background: var(--risk-soft); color: var(--risk); }
+.note { padding: 12px 16px; background: var(--accent-soft); border-radius: 6px; max-width: 78ch; }
+.note.warn { background: var(--todo-soft); }
+.note strong { font-weight: 600; }
+.why { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.why > div { padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; gap: 6px; }
+.why h3 { font-family: var(--font-body); font-size: 0.95rem; }
+.why p { font-size: 0.9rem; color: var(--muted); }
+.code { overflow-x: auto; max-width: 100%; background: var(--code-bg); border-radius: 6px; padding: 14px 16px; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55; }
+.code .c { color: var(--muted); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 520px) { h1 { font-size: 1.7rem; } }
+</style>
+
+<main>
+<header style="display:flex;flex-direction:column;gap:12px">
+  <span class="eyebrow">Technical specification</span>
+  <h1>Entra sign-in with GitHub and Jira connections</h1>
+  <p class="lede">A reference design for a company portal. Users sign in with Microsoft Entra ID. Then each user connects a personal GitHub account and a personal Jira account. This document lists every object to create, every setting to choose, and the reason for each choice.</p>
+  <div class="meta"><span>Source: portal-poc (Next.js 15, Auth.js, Terraform, Azure Container Apps)</span><span>Written in simplified technical English</span></div>
+  <div class="note"><strong>How to read the status tags.</strong> <span class="chip built">Built</span> means the portal-poc code or Terraform already does this. <span class="chip todo">Add</span> means the proof of concept does not do this yet, and your organization should add it. <span class="chip risk">Risk</span> marks a known weakness.</div>
+</header>
+
+<nav class="toc" aria-label="Contents">
+  <a href="#summary">1. Summary</a>
+  <a href="#context">2. System context</a>
+  <a href="#inventory">3. Objects to create</a>
+  <a href="#entra-app">4. Entra app registration</a>
+  <a href="#workload">5. Managed identity and federated credential</a>
+  <a href="#signin">6. Sign-in flow</a>
+  <a href="#access">7. Who may sign in</a>
+  <a href="#github">8. GitHub: App or OAuth App</a>
+  <a href="#atlassian">9. Atlassian (Jira)</a>
+  <a href="#connect">10. Connect flow and token storage</a>
+  <a href="#conditional">11. Conditional deployment</a>
+  <a href="#order">12. Deployment order</a>
+  <a href="#checklist">13. Replication checklist</a>
+  <a href="#risks">14. Gaps and open decisions</a>
+</nav>
+
+<section id="summary">
+  <h2>1. Summary</h2>
+  <p>The portal has one identity system and two connectors. Entra ID proves who the user is. GitHub and Atlassian give the portal permission to act for that user on their own systems.</p>
+  <div class="why">
+    <div><h3>Entra ID: identity</h3><p>OpenID Connect sign-in. The ID token claim <code>oid</code> becomes the user key in the portal.</p></div>
+    <div><h3>GitHub: delegated access</h3><p>A GitHub App (default) or a GitHub OAuth App. The portal receives a token that acts as the user.</p></div>
+    <div><h3>Atlassian: delegated access</h3><p>An OAuth 2.0 (3LO) app. The portal receives a token that acts as the user in Jira Cloud.</p></div>
+    <div><h3>Azure: hosting and trust</h3><p>A Container App with a managed identity. The identity replaces the Entra client secret.</p></div>
+  </div>
+  <h3>Design principles</h3>
+  <ol>
+    <li><strong>Prove both identities.</strong> A user signs in with Entra, then proves ownership of the GitHub and Jira accounts with each provider's own login. No email matching. No admin mapping table.</li>
+    <li><strong>No more access than the user has.</strong> The portal stores user tokens, not a shared service account. A token can only do what the user and the app can both do.</li>
+    <li><strong>No long-lived secret where a better option exists.</strong> Entra trusts the managed identity. Provider secrets stay in Container App secrets. Stored user tokens are encrypted.</li>
+    <li><strong>One deployment, one mode.</strong> Feature flags and conditional Terraform blocks turn each connector on or off without code changes.</li>
+  </ol>
+</section>
+
+<section id="context">
+  <h2>2. System context</h2>
+  <p>The diagram shows the parties and the trust between them. Solid arrows are runtime calls. The dashed arrow is a trust relationship that Entra checks.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  U["User browser"]
+  subgraph AZ["Azure subscription"]
+    direction TB
+    CA["Container App<br/>Portal, Next.js 15"]
+    MI["User-assigned<br/>managed identity"]
+    TS[("Token store<br/>encrypted records")]
+  end
+  subgraph ENTRA["Entra tenant"]
+    direction TB
+    APP["App registration<br/>and enterprise app"]
+    DIR["Users and groups"]
+  end
+  GH["GitHub<br/>App or OAuth App"]
+  AT["Atlassian<br/>OAuth 2.0 3LO app"]
+
+  U -->|"1 HTTPS"| CA
+  CA -->|"2 OIDC sign-in"| APP
+  APP --- DIR
+  CA -->|"3 connect GitHub"| GH
+  CA -->|"4 connect Jira"| AT
+  CA -->|"5 store tokens"| TS
+  CA --- MI
+  MI -.->|"federated credential"| APP
+</pre>
+  </div>
+  <p class="figcap">Figure 1. Parties and trust links.</p>
+</section>
+
+<section id="inventory">
+  <h2>3. Objects to create</h2>
+  <p>Your organization creates the following objects. Create the Entra and provider objects in each portal first. Terraform creates the Azure objects.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>#</th><th>Object</th><th>Where</th><th>Created by</th><th>Purpose</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td>Entra app registration</td><td>Entra admin center</td><td>Manual or <code>az</code> CLI <span class="chip built">Built</span></td><td>The identity of the portal in your tenant. Defines redirect URIs and trust.</td></tr>
+      <tr><td>2</td><td>Enterprise application (service principal)</td><td>Entra admin center</td><td>Created with the app registration</td><td>Controls who may sign in (user assignment).</td></tr>
+      <tr><td>3</td><td>Federated identity credential</td><td>On the app registration</td><td>Terraform <span class="chip built">Built</span></td><td>Lets the managed identity act as the app. Replaces a client secret.</td></tr>
+      <tr><td>4</td><td>User-assigned managed identity</td><td>Azure</td><td>Terraform <span class="chip built">Built</span></td><td>The workload identity of the Container App.</td></tr>
+      <tr><td>5</td><td>Resource group, Container App environment, Container App</td><td>Azure</td><td>Terraform <span class="chip built">Built</span></td><td>Hosts the portal over HTTPS.</td></tr>
+      <tr><td>6</td><td>Redirect URI list for the Web platform</td><td>On the app registration</td><td>Terraform <span class="chip built">Built</span></td><td>Tells Entra where it may return the user.</td></tr>
+      <tr><td>7</td><td>GitHub App (or OAuth App)</td><td>GitHub developer settings</td><td>Manual</td><td>Lets users authorize the portal to read their repositories.</td></tr>
+      <tr><td>8</td><td>Atlassian OAuth 2.0 (3LO) app</td><td>developer.atlassian.com</td><td>Manual</td><td>Lets users authorize the portal to read their Jira issues.</td></tr>
+      <tr><td>9</td><td>Token encryption key</td><td>Container App secret</td><td>Terraform <span class="chip built">Built</span></td><td>Encrypts stored GitHub and Jira tokens.</td></tr>
+      <tr><td>10</td><td>Durable token store</td><td>Azure (for example Cosmos DB)</td><td>Not yet <span class="chip todo">Add</span></td><td>The proof of concept writes files. A container file system is not durable.</td></tr>
+      <tr><td>11</td><td>App role or group for portal access</td><td>Entra</td><td>Not yet <span class="chip todo">Add</span></td><td>Limits sign-in to approved users.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note warn"><strong>Why the app registration is not in Terraform.</strong> In portal-poc, Terraform reads the app registration with a <code>data</code> source. It does not create it. A person creates it once. This keeps the client ID stable when the Azure resources are destroyed and created again. The <code>destroy.sh</code> script also keeps it for this reason. You can move it into Terraform later with the <code>azuread_application</code> resource.</div>
+</section>
+
+<section id="entra-app">
+  <h2>4. Entra app registration</h2>
+  <p>The app registration is the identity of the portal inside your tenant. The table lists each setting, the value to use, and the reason.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Setting</th><th>Value</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>Supported account types</td><td>Single tenant: "Accounts in this organizational directory only"</td><td>Only your employees sign in. The token issuer is then one fixed value: <code>https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0</code>. The portal can check the issuer with one string compare. Multi-tenant apps need extra issuer logic and add risk.</td></tr>
+      <tr><td>Platform type</td><td>Web</td><td>The portal is a server-side app. It keeps a confidential client and exchanges the code on the server. Do not use "Single-page application".</td></tr>
+      <tr><td>Redirect URIs</td><td><code>http://localhost:3000/api/auth/callback/microsoft-entra-id</code><br><code>https://&lt;portal-host&gt;/api/auth/callback/microsoft-entra-id</code></td><td>Entra returns the code only to a URI that matches exactly. The path is fixed by Auth.js. Keep localhost for development. Entra allows <code>http</code> only for localhost.</td></tr>
+      <tr><td>Implicit grant and hybrid flow</td><td>Off (both boxes clear)</td><td>The portal uses the authorization code flow. The implicit flow returns tokens in the browser URL and is not needed.</td></tr>
+      <tr><td>Client authentication, production</td><td>Federated identity credential. No client secret.</td><td>A secret expires, leaks, and needs rotation. A federated credential has no value to steal. See section 5.</td></tr>
+      <tr><td>Client authentication, local development</td><td>One client secret in <code>.env.local</code></td><td>A laptop has no managed identity. Keep the secret short-lived (for example 90 days). Never put it in git or in the Azure deployment.</td></tr>
+      <tr><td>API permissions</td><td>Microsoft Graph, delegated: <code>openid</code>, <code>profile</code>, <code>email</code> only</td><td>The portal needs only the identity of the user. Do not add Graph permissions that the portal does not use. Each permission adds consent scope and attack surface.</td></tr>
+      <tr><td>ID token claims used</td><td><code>oid</code>, <code>tid</code>, <code>name</code>, <code>preferred_username</code></td><td><code>oid</code> is the stable object ID of the user in the tenant. It never changes when the user changes name or email. The portal keys all stored connections on it. <code>tid</code> identifies the tenant.</td></tr>
+      <tr><td>Optional claims</td><td>None now. Add <code>roles</code> if you use app roles (section 7).</td><td>Smaller tokens. A <code>groups</code> claim can overflow for users with many groups. App roles avoid this.</td></tr>
+      <tr><td>Owners</td><td>The deployment identity or the platform team group</td><td>The Terraform identity must own the app registration. Without ownership, it cannot add the federated credential or the redirect URIs.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Commands</h3>
+  <p>These commands create the app registration and its enterprise application. Replace the values in angle brackets.</p>
+  <pre class="code"><span class="c"># 1. Create a single-tenant app registration with the local redirect URI</span>
+az ad app create \
+  --display-name "&lt;org&gt;-portal" \
+  --sign-in-audience AzureADMyOrg \
+  --web-redirect-uris "http://localhost:3000/api/auth/callback/microsoft-entra-id"
+
+<span class="c"># 2. Create the enterprise application (service principal) for the app</span>
+az ad sp create --id &lt;app-client-id&gt;
+
+<span class="c"># 3. Require user assignment (see section 7)</span>
+az ad sp update --id &lt;service-principal-object-id&gt; \
+  --set appRoleAssignmentRequired=true</pre>
+</section>
+
+<section id="workload">
+  <h2>5. Managed identity and federated credential</h2>
+  <p>In production, the portal does not hold an Entra client secret. The Container App has a user-assigned managed identity. Entra trusts tokens from that identity as proof that the caller is the app registration.</p>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant P as Portal code
+  participant M as Managed identity endpoint
+  participant E as Entra token endpoint
+  P->>M: Request token for audience api://AzureADTokenExchange
+  M-->>P: Signed JWT, subject is the identity object ID
+  P->>E: POST /oauth2/v2.0/token with auth code and client_assertion
+  Note over E: Match issuer, subject and audience<br/>to the federated credential on the app registration
+  E-->>P: ID token for the user
+</pre>
+  </div>
+  <p class="figcap">Figure 2. Token exchange without a client secret.</p>
+  <h3>Federated credential values</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Field</th><th>Value</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>Issuer</td><td><code>https://login.microsoftonline.com/&lt;tenant-id&gt;/v2.0</code></td><td>The managed identity token is issued by your own tenant.</td></tr>
+      <tr><td>Subject</td><td>Object (principal) ID of the managed identity</td><td>Only this one identity can act as the app. A different identity in the tenant is refused.</td></tr>
+      <tr><td>Audience</td><td><code>api://AzureADTokenExchange</code></td><td>This is the fixed audience that Entra requires for workload identity federation.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Why this choice</h3>
+  <div class="why">
+    <div><h3>No value to leak</h3><p>The managed identity token lives for a short time and only the platform can issue it. There is no secret in git, in an environment variable, or in Terraform state.</p></div>
+    <div><h3>No rotation job</h3><p>A client secret has an expiry date. When it expires, sign-in stops. A federated credential has no expiry.</p></div>
+    <div><h3>Tight scope</h3><p>The subject field links the app to one identity. You can create one identity per environment (dev, test, production).</p></div>
+  </div>
+  <p><span class="chip built">Built</span> The code in <code>auth.ts</code> uses two modes. If <code>AZURE_MI_CLIENT_ID</code> is set, it sets the client authentication method to <code>none</code>. It then adds <code>client_assertion</code> to the token request in a custom fetch. If the variable is not set, Auth.js uses the client secret from <code>.env.local</code>.</p>
+  <div class="note warn"><strong>Limit.</strong> GitHub and Atlassian do not accept this kind of federated trust for the user-authorization flow. Their client secrets must stay in Container App secrets (section 10). Microsoft sets a maximum number of federated credentials for each app registration. Check the current limit in Microsoft documentation before you plan many environments.</div>
+</section>
+
+<section id="signin">
+  <h2>6. Sign-in flow</h2>
+  <p>The portal uses the OpenID Connect authorization code flow. The code exchange happens on the server.</p>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant B as Browser
+  participant P as Portal
+  participant E as Entra
+  U->>B: Open the portal
+  B->>P: GET /
+  P-->>B: 302 to Entra authorize endpoint
+  B->>E: Authorize request with state and nonce
+  E->>U: Sign in, MFA, Conditional Access
+  E-->>B: 302 to /api/auth/callback/microsoft-entra-id with code
+  B->>P: GET callback with code
+  P->>E: Redeem code with client assertion
+  E-->>P: ID token with oid, tid, roles
+  Note over P: Validate issuer, audience, signature, nonce<br/>Store claims in session
+  P-->>B: Set session cookie, 302 to /
+</pre>
+  </div>
+  <p class="figcap">Figure 3. Entra sign-in with the authorization code flow.</p>
+  <ul>
+    <li>Auth.js sets <code>state</code>, <code>nonce</code> and PKCE for the sign-in request. The portal does not implement these checks. Use the library defaults.</li>
+    <li><code>AUTH_URL</code> must be the public HTTPS origin. Container Apps terminates TLS in a proxy. Without this value, the callback URL can have the wrong host. <span class="chip built">Built</span></li>
+    <li><code>AUTH_TRUST_HOST=true</code> tells Auth.js to trust the proxy headers. Set it only behind a known proxy. <span class="chip built">Built</span></li>
+    <li><code>AUTH_SECRET</code> signs the session cookie. Use a random 48-character value. Keep it secret (see section 14).</li>
+    <li>The session stores <code>oid</code> and <code>tid</code>. Every connector call reads <code>session.oid</code> on the server. The client cannot choose the user.</li>
+  </ul>
+</section>
+
+<section id="access">
+  <h2>7. Who may sign in</h2>
+  <p>A valid Entra sign-in is not the same as permission to use the portal. A tenant can have thousands of users. Add two controls.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+  A["User signs in"] --> B{"Conditional Access<br/>policy passes?"}
+  B -- "No" --> X1["Entra blocks sign-in"]
+  B -- "Yes" --> C{"Assigned to the<br/>enterprise application?"}
+  C -- "No" --> X2["Entra refuses: user not assigned"]
+  C -- "Yes" --> D{"ID token has role<br/>Portal.User?"}
+  D -- "No" --> X3["Portal refuses the session"]
+  D -- "Yes" --> OK["Portal session starts"]
+</pre>
+  </div>
+  <p class="figcap">Figure 4. Three gates, in order. Entra enforces the first two. The portal enforces the third.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Control</th><th>Setting</th><th>Reason</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>User assignment required</td><td>Enterprise application, Properties: "Assignment required" = Yes</td><td>Entra refuses users that nobody assigned. This is the cheapest gate and runs before any portal code.</td><td><span class="chip todo">Add</span></td></tr>
+      <tr><td>App role</td><td>App role <code>Portal.User</code> on the app registration. Assign it to a group.</td><td>The role appears in the <code>roles</code> claim. The portal can check it. A role claim stays small. A <code>groups</code> claim can overflow.</td><td><span class="chip todo">Add</span></td></tr>
+      <tr><td>Portal role check</td><td>In the Auth.js <code>signIn</code> or <code>jwt</code> callback, refuse if <code>roles</code> lacks <code>Portal.User</code></td><td>Defense in depth. It still protects the portal if someone turns off "Assignment required".</td><td><span class="chip todo">Add</span></td></tr>
+      <tr><td>Conditional Access</td><td>Policy for the enterprise application: require MFA, and optionally a compliant device</td><td>The portal stores tokens that read source code and tickets. Protect it with your normal strong-authentication rules.</td><td><span class="chip todo">Add</span></td></tr>
+      <tr><td>Tenant check</td><td>Refuse a session when <code>tid</code> differs from your tenant ID</td><td>A second protection for the single-tenant rule. Also key stored records on <code>tid</code> and <code>oid</code> together.</td><td><span class="chip todo">Add</span></td></tr>
+    </tbody>
+  </table></div>
+  <div class="note warn"><strong>Licence.</strong> Assignment of groups to an application, and Conditional Access, need Microsoft Entra ID P1 or P2. On the Free tier, assign users one by one. Confirm the current licence rules with Microsoft before you design around them.</div>
+  <p><span class="chip risk">Risk</span> The proof of concept has none of these controls in code. Any user in the tenant who can reach the portal URL can sign in unless "Assignment required" is on.</p>
+</section>
+
+<section id="github">
+  <h2>8. GitHub: App or OAuth App</h2>
+  <p>GitHub has two ways to let a user authorize the portal. The portal supports both. One deployment uses one mode, set by <code>GITHUB_AUTH_MODE</code>.</p>
+  <div class="scroll"><table>
+    <thead><tr><th></th><th>GitHub App (<code>app</code>, default)</th><th>OAuth App (<code>oauth</code>)</th></tr></thead>
+    <tbody>
+      <tr><td>Permission model</td><td>Fine-grained: Metadata read, Contents read</td><td>Broad scope: <code>read:user repo</code></td></tr>
+      <tr><td>What the portal can list</td><td>Only repositories where the App is installed</td><td>Every repository the user can access, private included</td></tr>
+      <tr><td>Write access risk</td><td>None. Only read permissions are set.</td><td>The <code>repo</code> scope grants read and write to all private repositories of the user</td></tr>
+      <tr><td>Token lifetime</td><td>Access token expires (8 hours by default). A refresh token renews it.</td><td>Token does not expire</td></tr>
+      <tr><td>PKCE</td><td>Sent (S256)</td><td>Not sent</td></tr>
+      <tr><td>Callback URLs</td><td>More than one is allowed</td><td>One only. Use one app per environment.</td></tr>
+      <tr><td>Organization control</td><td>An organization owner installs the App on chosen repositories</td><td>An owner can restrict third-party OAuth apps and must approve the app</td></tr>
+      <tr><td>Repository list call</td><td><code>/user/installations/{id}/repositories</code></td><td><code>/user/repos</code></td></tr>
+    </tbody>
+  </table></div>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+  S["Need GitHub access for users"] --> Q1{"Must the portal see<br/>all repos of a user,<br/>with no admin install?"}
+  Q1 -- "No" --> APP["Use a GitHub App<br/>GITHUB_AUTH_MODE=app"]
+  Q1 -- "Yes" --> Q2{"Can you accept read and<br/>write on all private repos<br/>and a token that never expires?"}
+  Q2 -- "No" --> APP
+  Q2 -- "Yes" --> OA["Use an OAuth App<br/>GITHUB_AUTH_MODE=oauth"]
+  APP --> R1["Recommended for a company"]
+</pre>
+  </div>
+  <p class="figcap">Figure 5. Choice between the two GitHub modes.</p>
+  <h3>Recommendation</h3>
+  <p>Use a <strong>GitHub App</strong>. It follows the least-privilege principle. A token can only read the repositories where the App is installed, and only with the permissions you set. A stolen token expires in hours. An OAuth App token gives write access to every private repository of the user and has no expiry.</p>
+  <h3>GitHub App settings</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Setting</th><th>Value</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>Owner of the App</td><td>Your GitHub <strong>organization</strong>, not a personal account</td><td>The App must outlive any one person. If the owner leaves, a personal App becomes an orphan.</td></tr>
+      <tr><td>Callback URLs</td><td><code>http://localhost:3000/api/connect/github/callback</code><br><code>https://&lt;portal-host&gt;/api/connect/github/callback</code></td><td>GitHub returns the code only to a registered URL.</td></tr>
+      <tr><td>Expire user authorization tokens</td><td>On</td><td>Short-lived tokens limit the damage of a leak. The portal refreshes them.</td></tr>
+      <tr><td>Request user authorization during installation</td><td>Off</td><td>The portal starts its own authorization flow. A second flow is not needed.</td></tr>
+      <tr><td>Webhook</td><td>Inactive</td><td>The portal does not receive GitHub events. Do not open an unused endpoint.</td></tr>
+      <tr><td>Repository permissions</td><td>Metadata: Read-only (mandatory). Contents: Read-only.</td><td>Metadata lets the portal list repositories. Contents lets a later agent read code. Add nothing else until a feature needs it.</td></tr>
+      <tr><td>Installation</td><td>Install on the organization. Select the repositories.</td><td>The portal lists only repositories from installations the user can access. No installation means an empty list.</td></tr>
+      <tr><td>Credentials</td><td>Client ID and one client secret</td><td>Use the <strong>Client ID</strong>, not the numeric App ID. Put both in <code>GITHUB_CLIENT_ID</code> and <code>GITHUB_CLIENT_SECRET</code>.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note warn"><strong>Unverified.</strong> The portal-poc README states that its GitHub registration steps are "from memory". Check them against the current GitHub documentation. Also test how your organization's SAML single sign-on affects user tokens. A user can need to authorize the token for SAML before it reaches protected repositories.</div>
+</section>
+
+<section id="atlassian">
+  <h2>9. Atlassian (Jira)</h2>
+  <p>The portal uses OAuth 2.0 with three-legged authorization (3LO). The portal calls Jira Cloud through <code>api.atlassian.com</code>, not through the site URL.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Setting</th><th>Value</th><th>Reason</th></tr></thead>
+    <tbody>
+      <tr><td>App type</td><td>OAuth 2.0 integration</td><td>This type gives user-delegated tokens.</td></tr>
+      <tr><td>Callback URL</td><td><code>https://&lt;portal-host&gt;/api/connect/jira/callback</code></td><td>The console can accept only one URL. Register one app for each environment.</td></tr>
+      <tr><td>Scopes</td><td>Granular read scopes for issue search, plus <code>read:me</code> and <code>offline_access</code></td><td>Read-only access is enough to pick an issue. <code>offline_access</code> gives the refresh token. Without it, users must sign in again each hour.</td></tr>
+      <tr><td>Scope override</td><td><code>ATLASSIAN_SCOPES</code></td><td>Atlassian answers 400 if you ask for a scope that the app lacks. Change scopes without a code change.</td></tr>
+      <tr><td>Authorize parameters</td><td><code>audience=api.atlassian.com</code>, <code>prompt=consent</code></td><td>The audience is required. <code>consent</code> shows the site selection and scope list each time.</td></tr>
+      <tr><td>Distribution</td><td>"Sharing" before other people connect</td><td>In development status only the owner can authorize the app.</td></tr>
+      <tr><td>Owner of the app</td><td>A shared admin or service account</td><td>The same reason as for GitHub: do not tie the app to one person.</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><strong>Refresh tokens rotate.</strong> Each refresh returns a new refresh token. The portal must store the new one at once. The code does this. <span class="chip built">Built</span></li>
+    <li><strong>One site only.</strong> The portal uses the first site from <code>accessible-resources</code>. If your users have more than one Jira site, add a site picker. <span class="chip risk">Risk</span></li>
+    <li><strong>PKCE.</strong> The portal-poc Atlassian flow uses a client secret and does not send PKCE. Verify whether the current Atlassian documentation supports PKCE for 3LO, and enable it if it does.</li>
+  </ul>
+</section>
+
+<section id="connect">
+  <h2>10. Connect flow and token storage</h2>
+  <p>After sign-in, the user opens Settings and selects Connect. The same pattern runs for GitHub and Jira. The user proves control of the provider account when the provider shows its own login and consent screen.</p>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant P as Portal
+  participant X as GitHub or Atlassian
+  participant S as Token store
+  B->>P: GET /api/connect/provider/start
+  Note over P: Read oid from session<br/>Create state and PKCE verifier<br/>Seal them in an HTTP-only cookie
+  P-->>B: 302 to provider authorize URL and Set-Cookie
+  B->>X: User signs in and consents
+  X-->>B: 302 to /api/connect/provider/callback with code and state
+  B->>P: GET callback with cookie
+  Note over P: Run the checks in Figure 7
+  P->>X: Exchange code for tokens
+  X-->>P: Access token and refresh token
+  P->>X: Read account name
+  P->>S: Put encrypted record for oid and provider
+  P-->>B: 302 to /settings
+</pre>
+  </div>
+  <p class="figcap">Figure 6. Connect flow. The portal binds the flow to the signed-in Entra user.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart LR
+  A["Cookie present?"] --> B["Decrypts and<br/>authenticates?"]
+  B --> C["Less than 10<br/>minutes old?"]
+  C --> D["Same provider?"]
+  D --> E["Same Entra oid<br/>as the session?"]
+  E --> F["state equals<br/>the query state?<br/>constant-time compare"]
+  F --> G["Exchange the code"]
+</pre>
+  </div>
+  <p class="figcap">Figure 7. Callback checks. Any failed check stops the flow with an error code. <span class="chip built">Built</span></p>
+  <h3>Why each security control exists</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Control</th><th>Threat it stops</th></tr></thead>
+    <tbody>
+      <tr><td>Random <code>state</code></td><td>Cross-site request forgery. An attacker cannot make a user connect the attacker's account.</td></tr>
+      <tr><td>PKCE verifier (GitHub App mode)</td><td>Theft of the authorization code in transit.</td></tr>
+      <tr><td>State cookie bound to <code>oid</code></td><td>One user cannot finish a flow that another user started.</td></tr>
+      <tr><td>Cookie: HTTP-only, <code>SameSite=Lax</code>, path-limited, 10 minute life</td><td>Script access, cross-site sending, and long replay. <code>Lax</code> is required so the cookie survives the redirect back from the provider.</td></tr>
+      <tr><td>AES-256-GCM for cookie and tokens</td><td>Reading or editing the data. GCM detects any change.</td></tr>
+      <tr><td>Additional authenticated data = <code>token:&lt;oid&gt;:&lt;provider&gt;</code></td><td>Swapping a stored record from one user to another. The decryption fails.</td></tr>
+      <tr><td>Server-side calls with the caller's own token</td><td>The portal never uses a shared service account for user data.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Secrets and where they live</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Secret</th><th>Location</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>Entra client credential</td><td>None in production (federated)</td><td>Local development only: <code>.env.local</code>.</td></tr>
+      <tr><td><code>GITHUB_CLIENT_SECRET</code>, <code>ATLASSIAN_CLIENT_SECRET</code></td><td>Container App secret, read by secret reference</td><td>Rotate on a schedule. Rotate at once if someone leaves the platform team.</td></tr>
+      <tr><td><code>TOKEN_ENCRYPTION_KEY</code></td><td>Container App secret</td><td>If you lose the key, stored tokens become unreadable and users must reconnect.</td></tr>
+      <tr><td><code>AUTH_SECRET</code></td><td>Environment variable now</td><td>Move it to a secret reference (section 14).</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="conditional">
+  <h2>11. Conditional deployment</h2>
+  <p>One code base and one Terraform module serve many situations. A connector exists only when its settings exist. A flag picks the GitHub mode. This lets you deploy sign-in first and add each connector later.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+  subgraph TF["Terraform plan time"]
+    V1["github_client_id and<br/>github_client_secret both set?"] -->|"Yes"| G1["Create secret github-client-secret<br/>and env GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET"]
+    V1 -->|"No"| G0["Create none of them"]
+    V2["atlassian_client_id and<br/>atlassian_client_secret both set?"] -->|"Yes"| A1["Create secret atlassian-client-secret<br/>and matching env"]
+    V2 -->|"No"| A0["Create none of them"]
+    V3["github_auth_mode"] -->|"app or oauth"| M1["Set GITHUB_AUTH_MODE"]
+    V3 -->|"other value"| M0["Plan fails: validation error"]
+    V4["image empty?"] -->|"Yes"| I1["Use placeholder image<br/>for the first apply"]
+    V4 -->|"No"| I2["Use the portal image"]
+  end
+  subgraph RT["Runtime, per provider"]
+    R1{"PROTOTYPE_NO_AUTH unset,<br/>client ID and secret set,<br/>TOKEN_ENCRYPTION_KEY set,<br/>mode valid?"}
+    R1 -->|"Yes"| LIVE["Live: real OAuth connect"]
+    R1 -->|"No"| SAMPLE["Sample data, Connect disabled"]
+  end
+  G1 --> R1
+  A1 --> R1
+</pre>
+  </div>
+  <p class="figcap">Figure 8. Conditional logic at plan time and at runtime.</p>
+  <div class="scroll"><table>
+    <thead><tr><th>Switch</th><th>Where</th><th>Effect</th></tr></thead>
+    <tr><td><code>github_enabled</code>, <code>atlassian_enabled</code></td><td>Terraform <code>locals</code></td><td>True only when both the client ID and the client secret are non-empty. A half-set provider creates nothing, so the app never starts with a broken connector.</td></tr>
+    <tr><td><code>dynamic "secret"</code> and <code>dynamic "env"</code> blocks</td><td>Container App resource</td><td>Create the block only when the provider is enabled. A disabled provider leaves no empty secret in the app.</td></tr>
+    <tr><td><code>github_auth_mode</code> with <code>validation</code></td><td>Terraform variable</td><td>Rejects any value other than <code>app</code> or <code>oauth</code> before Azure changes. One mode per deployment lets you deploy both and compare.</td></tr>
+    <tr><td><code>image = ""</code></td><td>Terraform variable</td><td>Uses a public placeholder image. This lets the first apply create the host name before the portal image is ready.</td></tr>
+    <tr><td><code>token_encryption_key = ""</code></td><td>Terraform variable</td><td>Terraform generates a stable key with <code>random_id</code>. Supply your own key to control it.</td></tr>
+    <tr><td><code>isLive(provider)</code></td><td>Portal runtime</td><td>A provider is live only when all conditions in Figure 8 pass. Otherwise the portal shows sample data and logs the reason.</td></tr>
+    <tr><td><code>PROTOTYPE_NO_AUTH=1</code></td><td>Portal runtime</td><td>Skips sign-in. Use for local demos only. <span class="chip risk">Risk</span> Never set it in a deployed environment.</td></tr>
+  </table></div>
+  <div class="note"><strong>Interpretation.</strong> This section reads "conditional deployment" as conditional Terraform resources and feature flags. If you also meant Microsoft Entra <em>Conditional Access</em> policies, section 7 covers them.</div>
+  <h3>Mode change rule</h3>
+  <p>Changing <code>GITHUB_AUTH_MODE</code> invalidates every stored GitHub connection. Each record keeps the mode that created it. The portal does not use a record from another mode, and the user connects again. Also change the client ID and secret to match the new kind of app.</p>
+</section>
+
+<section id="order">
+  <h2>12. Deployment order</h2>
+  <p>The order matters. The public URL of the portal exists only after the first apply. GitHub and Atlassian need that URL as a callback. The Entra redirect URI needs it too.</p>
+  <div class="diagram">
+<pre class="mermaid">
+flowchart TD
+  P0["Phase 0<br/>Create the Entra app registration<br/>and enterprise application"] --> P1
+  P1["Phase 1<br/>terraform apply with the placeholder image<br/>and no provider credentials"] --> URL["Output: portal_url"]
+  URL --> P2["Phase 2<br/>Create the GitHub App and the Atlassian app<br/>Register the portal_url callbacks"]
+  P2 --> P3["Phase 3<br/>Put client IDs and secrets in the environment<br/>Build and push the image"]
+  P3 --> P4["Phase 4<br/>terraform apply again<br/>Providers become enabled"]
+  P4 --> P5["Phase 5<br/>Assign users or group<br/>Set Conditional Access"]
+  P5 --> P6["Phase 6<br/>Test: sign in, connect GitHub, connect Jira"]
+</pre>
+  </div>
+  <p class="figcap">Figure 9. Phases of a first deployment.</p>
+  <ul>
+    <li><strong>Phase 1 detail.</strong> Terraform creates the resource group, the managed identity, the federated credential, the Container App environment and the redirect URIs. The environment default domain gives the URL.</li>
+    <li><strong>Redirect URI list.</strong> The <code>azuread_application_redirect_uris</code> resource replaces all redirect URIs of the Web type. Include localhost and the deployed URL in the list. Do not add URIs by hand, because Terraform removes them.</li>
+    <li><strong>Container image.</strong> The portal-poc pipeline pushes to GitHub Container Registry. The image must be public because Container Apps pulls it with no credentials. For a company, use Azure Container Registry with the managed identity instead.</li>
+    <li><strong>One command.</strong> <code>scripts/deploy.sh</code> builds, pushes, plans, asks for confirmation and applies. <code>scripts/destroy.sh</code> removes the Azure objects and keeps the app registration.</li>
+  </ul>
+</section>
+
+<section id="checklist">
+  <h2>13. Replication checklist</h2>
+  <h3>Values to choose for your organization</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Placeholder</th><th>Example</th><th>Used in</th></tr></thead>
+    <tbody>
+      <tr><td><code>&lt;org&gt;</code></td><td>acme</td><td>App registration and resource names</td></tr>
+      <tr><td><code>&lt;tenant-id&gt;</code></td><td>GUID of your Entra tenant</td><td>Issuer URL, federated credential</td></tr>
+      <tr><td><code>&lt;subscription-id&gt;</code></td><td>GUID of the Azure subscription</td><td>Terraform <code>subscription_id</code></td></tr>
+      <tr><td><code>&lt;region&gt;</code></td><td>The Azure region close to your users</td><td>Terraform <code>location</code></td></tr>
+      <tr><td><code>&lt;app-client-id&gt;</code></td><td>Output of <code>az ad app create</code></td><td>Terraform <code>app_client_id</code>, <code>AUTH_MICROSOFT_ENTRA_ID_ID</code></td></tr>
+      <tr><td><code>&lt;portal-host&gt;</code></td><td>Output <code>portal_url</code></td><td>All callback URLs</td></tr>
+      <tr><td><code>&lt;github-org&gt;</code></td><td>Your GitHub organization</td><td>Owner of the GitHub App</td></tr>
+      <tr><td><code>IMAGE_REPO</code></td><td>Your container registry path</td><td><code>deploy.sh</code></td></tr>
+    </tbody>
+  </table></div>
+  <h3>Steps</h3>
+  <ol>
+    <li>Choose a name, a region and a subscription. Confirm you can create app registrations in the tenant.</li>
+    <li>Create the Entra app registration as a single-tenant Web app (section 4). Add yourself and the deployment identity as owners.</li>
+    <li>Create the enterprise application. Set "Assignment required" to Yes. Create the <code>Portal.User</code> role and assign a group (section 7).</li>
+    <li>Run <code>terraform apply</code> with the placeholder image. Record <code>portal_url</code>.</li>
+    <li>Create the GitHub App under your organization (section 8). Install it on the selected repositories.</li>
+    <li>Create the Atlassian OAuth 2.0 app (section 9). Set the scopes.</li>
+    <li>Put the client IDs and secrets in the deployment environment. Do not commit them.</li>
+    <li>Build the image and run <code>terraform apply</code> again.</li>
+    <li>Add the role check and tenant check to <code>auth.ts</code> (section 7).</li>
+    <li>Test with an assigned user and with an unassigned user. The unassigned user must be refused.</li>
+    <li>Test connect and disconnect for each provider. Test token refresh after the access token expires.</li>
+    <li>Fix the items in section 14 before real users connect.</li>
+  </ol>
+</section>
+
+<section id="risks">
+  <h2>14. Gaps and open decisions</h2>
+  <h3>Known gaps in the proof of concept</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>Gap</th><th>Impact</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip risk">Risk</span> Token store writes local files</td><td>Container storage is not durable. Tokens are lost on restart or scale-out.</td><td>Implement the <code>TokenStore</code> interface with Cosmos DB or similar. Keep the AES-GCM layer.</td></tr>
+      <tr><td><span class="chip risk">Risk</span> Encryption key is in Terraform state</td><td>Anyone who can read the state can read the key.</td><td>Keep the key in Azure Key Vault. Use remote, encrypted, access-controlled state.</td></tr>
+      <tr><td><span class="chip risk">Risk</span> <code>AUTH_SECRET</code> is a plain environment variable</td><td>It shows in the Container App configuration.</td><td>Move it to a Container App secret and reference it.</td></tr>
+      <tr><td><span class="chip risk">Risk</span> No access gate</td><td>Any tenant user can sign in.</td><td>Do section 7.</td></tr>
+      <tr><td><span class="chip risk">Risk</span> Disconnect does not revoke tokens</td><td>A deleted record leaves a valid token at GitHub or Atlassian.</td><td>Call each provider's revoke endpoint before you delete.</td></tr>
+      <tr><td><span class="chip risk">Risk</span> Refresh is not locked across replicas</td><td>Two refreshes can race. Atlassian rotates refresh tokens, so one user can lose the connection.</td><td>Keep <code>max_replicas = 1</code> or add a lock in the store.</td></tr>
+      <tr><td>Records keyed on <code>oid</code> alone</td><td>Safe in one tenant. Unsafe if you later add tenants.</td><td>Key on <code>tid</code> and <code>oid</code>.</td></tr>
+      <tr><td><code>min_replicas = 0</code></td><td>The first sign-in after idle time is slow.</td><td>Set 1 for production.</td></tr>
+      <tr><td>Public image on GHCR</td><td>Anyone can pull the image.</td><td>Use a private registry with managed identity pull access.</td></tr>
+      <tr><td>Local Terraform state</td><td>No team access and no locking.</td><td>Use an Azure Storage backend.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Decisions for your organization</h3>
+  <ol>
+    <li>GitHub mode: App (recommended) or OAuth App.</li>
+    <li>Who owns the GitHub App and the Atlassian app, and who rotates their secrets.</li>
+    <li>Access group: which Entra group gets <code>Portal.User</code>, and whether you have P1 licences for group assignment.</li>
+    <li>Conditional Access: MFA only, or MFA and compliant device.</li>
+    <li>Number of environments (dev, test, production). Each one needs its own redirect URIs, GitHub callback, Atlassian app and managed identity.</li>
+    <li>Whether Terraform should create the app registration in the future.</li>
+    <li>Whether the agent later acts as the user (user token) or as the bot with a narrow installation token.</li>
+  </ol>
+  <h3>Items not verified</h3>
+  <ul>
+    <li>This document comes from reading the portal-poc code and from general knowledge of Entra, GitHub and Atlassian. Platform limits, licence rules and portal screens change. Check Microsoft, GitHub and Atlassian documentation before you apply any step in production.</li>
+    <li>The maximum number of federated credentials per app registration.</li>
+    <li>SAML single sign-on effects on GitHub App user tokens.</li>
+    <li>PKCE support for the Atlassian 3LO flow.</li>
+    <li>Whether your tenant allows app registration by the deployment identity.</li>
+  </ul>
+</section>
+</main>
