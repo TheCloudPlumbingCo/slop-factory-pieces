@@ -2,11 +2,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { Provider } from "@/lib/tokens";
 import type { GithubInfo } from "@/lib/githubMode";
-import { Connection, Task, Workspace, seedTasks, seedWorkspaces } from "@/lib/mock";
+import { Connection, SAMPLE_PRS, Task, seedTasks } from "@/lib/mock";
 
 type State = {
   tasks: Task[];
-  workspaces: Workspace[];
   jira: Connection;
   github: Connection;
 };
@@ -15,23 +14,19 @@ type Api = State & {
   ready: boolean;
   githubInfo: GithubInfo;
   live: Record<Provider, boolean>; // true = real connection, false = simulated sample data
-  startResearch: (key: string, title: string, workspace: string) => void;
-  approve: (id: string) => void;
-  stop: (id: string) => void;
+  /** Start the RPI workflow for a Jira ticket. The workspace is found from the ticket's project code. */
+  startRpi: (key: string, title: string) => void;
   connect: (p: Provider) => void;
   disconnect: (p: Provider) => Promise<void>;
-  addWorkspace: (name: string, repos: string[]) => void;
-  removeWorkspace: (id: string) => void;
   reset: () => void;
 };
 
 const Ctx = createContext<Api | null>(null);
-const KEY = "slop-portal-prototype-v1";
+const KEY = "slop-portal-prototype-v2";
 const RUN_MS = 6000; // how long a simulated run takes
 
 const initial = (): State => ({
   tasks: seedTasks(Date.now()),
-  workspaces: seedWorkspaces,
   jira: { connected: false },
   github: { connected: false },
 });
@@ -71,7 +66,8 @@ export function Store({ children, live, githubInfo }: { children: React.ReactNod
     if (ready) localStorage.setItem(KEY, JSON.stringify(state));
   }, [state, ready]);
 
-  // Simulated agent: a running task finishes after RUN_MS.
+  // Simulated agent: a running task finishes after RUN_MS and then waits for a person to approve the pull request in
+  // GitHub. Approval is not done here, so the sample never moves past that point on its own.
   useEffect(() => {
     const t = setInterval(() => {
       setState((s) => {
@@ -80,9 +76,8 @@ export function Store({ children, live, githubInfo }: { children: React.ReactNod
         const tasks = s.tasks.map((task) => {
           if (task.status !== "running" || now - task.since < RUN_MS) return task;
           changed = true;
-          if (task.stage === "implement") return { ...task, status: "done" as const, since: now, note: "Pull request opened (sample)." };
           const note = task.stage === "research" ? "Research ready: found the likely cause and 2 related files." : "Plan ready: 4 steps across the workspace repos.";
-          return { ...task, status: "needs-approval" as const, since: now, note };
+          return { ...task, status: "needs-approval" as const, since: now, note, prUrl: task.prUrl ?? SAMPLE_PRS };
         });
         return changed ? { ...s, tasks } : s;
       });
@@ -90,24 +85,11 @@ export function Store({ children, live, githubInfo }: { children: React.ReactNod
     return () => clearInterval(t);
   }, []);
 
-  const startResearch = useCallback((key: string, title: string, workspace: string) => {
+  const startRpi = useCallback((key: string, title: string) => {
     setState((s) => ({
       ...s,
-      tasks: [{ id: crypto.randomUUID(), key, title, workspace, stage: "research", status: "running", since: Date.now() }, ...s.tasks],
+      tasks: [{ id: crypto.randomUUID(), key, title, stage: "research", status: "running", since: Date.now() }, ...s.tasks],
     }));
-  }, []);
-
-  const approve = useCallback((id: string) => {
-    setState((s) => ({
-      ...s,
-      tasks: s.tasks.map((t) =>
-        t.id !== id ? t : { ...t, stage: t.stage === "research" ? "plan" : "implement", status: "running", since: Date.now(), note: undefined },
-      ),
-    }));
-  }, []);
-
-  const stop = useCallback((id: string) => {
-    setState((s) => ({ ...s, tasks: s.tasks.map((t) => (t.id === id ? { ...t, status: "stopped", since: Date.now() } : t)) }));
   }, []);
 
   const connect = useCallback((p: Provider) => {
@@ -122,15 +104,11 @@ export function Store({ children, live, githubInfo }: { children: React.ReactNod
     setState((s) => ({ ...s, [p]: { connected: false } }));
   }, [live]);
 
-  const addWorkspace = useCallback((name: string, repos: string[]) => {
-    setState((s) => ({ ...s, workspaces: [...s.workspaces, { id: crypto.randomUUID(), name, repos }] }));
-  }, []);
-  const removeWorkspace = useCallback((id: string) => setState((s) => ({ ...s, workspaces: s.workspaces.filter((w) => w.id !== id) })), []);
   const reset = useCallback(() => setState(initial()), []);
 
   const api = useMemo<Api>(
-    () => ({ ...state, ready, live, githubInfo, startResearch, approve, stop, connect, disconnect, addWorkspace, removeWorkspace, reset }),
-    [state, ready, live, githubInfo, startResearch, approve, stop, connect, disconnect, addWorkspace, removeWorkspace, reset],
+    () => ({ ...state, ready, live, githubInfo, startRpi, connect, disconnect, reset }),
+    [state, ready, live, githubInfo, startRpi, connect, disconnect, reset],
   );
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

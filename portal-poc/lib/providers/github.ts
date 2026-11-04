@@ -108,3 +108,32 @@ export async function listRepos(token: string, mode: GithubMode = "app"): Promis
   }
   return sorted(repos);
 }
+
+/** A pull request that is waiting for the signed-in person's review. */
+export type ReviewRequest = { number: number; title: string; url: string; repo: string; updatedAt: string; key: string | null };
+
+const JIRA_KEY = /\b[A-Z][A-Z0-9]+-\d+\b/;
+
+/**
+ * Open pull requests where this person's review is requested. Approvals are pull requests, so this is the real
+ * "needs my attention" list. `org` limits the search to one organisation; without it every repo the token can see counts.
+ * The Jira key is read from the title, then the body, when there is one.
+ */
+export async function listReviewRequests(token: string, org?: string): Promise<ReviewRequest[]> {
+  const q = ["is:pr", "is:open", "review-requested:@me", ...(org ? [`org:${org}`] : [])].join(" ");
+  const params = new URLSearchParams({ q, sort: "updated", order: "desc", per_page: "50" });
+  const body = await getJson<{ items: { number: number; title: string; html_url: string; repository_url: string; updated_at: string; body?: string | null }[] }>(
+    `${API}/search/issues?${params}`,
+    token,
+    "GitHub review requests",
+    GH_HEADERS,
+  );
+  return body.items.map((i) => ({
+    number: i.number,
+    title: i.title,
+    url: i.html_url,
+    repo: i.repository_url.replace(`${API}/repos/`, ""),
+    updatedAt: i.updated_at,
+    key: JIRA_KEY.exec(i.title)?.[0] ?? JIRA_KEY.exec(i.body ?? "")?.[0] ?? null,
+  }));
+}

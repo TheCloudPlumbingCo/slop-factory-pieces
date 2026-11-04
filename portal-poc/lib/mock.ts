@@ -1,45 +1,40 @@
 export type Stage = "research" | "plan" | "implement";
 export type Status = "running" | "needs-approval" | "done" | "stopped";
 
+/** One run of the RPI workflow (research, plan, implement) for a Jira ticket. */
 export type Task = {
   id: string;
   key: string;
   title: string;
-  workspace: string;
   stage: Stage;
   status: Status;
   since: number; // ms timestamp of the last status change
   note?: string;
+  /** Where the approval happens. Every approval is a pull request in the workspace repo. */
+  prUrl?: string;
 };
 
-export type Workspace = { id: string; name: string; repos: string[] };
 export type Connection = { connected: boolean; account?: string };
 
-export const jiraIssues = [
-  { key: "PAY-142", title: "Checkout fails when the saved card has expired" },
-  { key: "PAY-139", title: "Refunds over 30 days are rejected without a message" },
-  { key: "PAY-131", title: "Retry webhooks from the card processor with backoff" },
-  { key: "PLAT-88", title: "Rate limit the public search endpoint" },
-  { key: "PLAT-86", title: "Move session storage from Redis to Cosmos" },
-  { key: "PLAT-79", title: "Audit log entries are missing the actor's tenant" },
-  { key: "PAY-120", title: "Invoice PDF shows the wrong VAT line for AU customers" },
-  { key: "PLAT-64", title: "Sandbox runs should clean up cloned repos on failure" },
-];
+/** The GitHub project board that holds the real state. The portal only links to it. */
+export const projectBoardUrl = process.env.NEXT_PUBLIC_PROJECT_URL ?? "https://github.com/orgs/TheCloudPlumbingCo/projects/4";
 
-export const seedWorkspaces: Workspace[] = [
-  { id: "w1", name: "payments-team", repos: ["api-gateway", "checkout-service", "billing-lib"] },
-  { id: "w2", name: "platform-core", repos: ["identity-service", "audit-log"] },
+export const SAMPLE_PRS = "https://github.com/TheCloudPlumbingCo/teahouse-workspace/pulls";
+
+export const jiraIssues = [
+  { key: "KAN-2", title: "As a tea drinker, I want to order an iced tea so I can have a cold drink on a hot day" },
+  { key: "KAN-3", title: "As a customer, I want to choose my tea leaf variety and strength so the cup matches my taste" },
+  { key: "KAN-4", title: "As a tea maker, I want the right water temperature for each tea so it is not bitter or weak" },
+  { key: "KAN-5", title: "As a customer, I want a friendly message when the kitchen is slow or down, so I am not left hanging" },
+  { key: "KAN-6", title: "As a teahouse operator, I want a dashboard of orders, latency and errors so I can see how the shop is doing" },
+  { key: "KAN-9", title: "Tea order hangs for a long time when the water service is slow" },
+  { key: "KAN-10", title: "Unknown tea variety returns a server error instead of a clear message" },
+  { key: "KAN-12", title: "Services fail to build because teahouse-core cannot be resolved from GitHub Packages" },
 ];
 
 export const seedTasks = (now: number): Task[] => [
-  { id: "t1", key: "PAY-131", title: "Retry webhooks from the card processor with backoff", workspace: "payments-team", stage: "research", status: "needs-approval", since: now - 3_600_000, note: "Found 2 places that drop failed deliveries. Proposes a retry queue." },
-  { id: "t2", key: "PLAT-79", title: "Audit log entries are missing the actor's tenant", workspace: "platform-core", stage: "plan", status: "needs-approval", since: now - 7_200_000, note: "Plan touches 3 files in audit-log and 1 in identity-service." },
-  { id: "t3", key: "PAY-120", title: "Invoice PDF shows the wrong VAT line for AU customers", workspace: "payments-team", stage: "implement", status: "done", since: now - 86_400_000, note: "PR #214 open in billing-lib." },
-];
-
-// Repos the signed-in person can see on GitHub (sample).
-export const githubRepos = [
-  "acme/api-gateway", "acme/checkout-service", "acme/billing-lib", "acme/identity-service",
-  "acme/audit-log", "acme/web-storefront", "acme/mobile-app", "acme/infra-terraform",
-  "acme/search-service", "acme/notification-hub", "acme/data-pipeline", "alice-dev/dotfiles",
+  { id: "t1", key: "KAN-9", title: "Tea order hangs for a long time when the water service is slow", stage: "research", status: "needs-approval", since: now - 3_600_000, note: "Open decision: add timeouts in tea-service only, or also in the shared client in teahouse-core.", prUrl: SAMPLE_PRS },
+  { id: "t2", key: "KAN-4", title: "As a tea maker, I want the right water temperature for each tea so it is not bitter or weak", stage: "plan", status: "needs-approval", since: now - 7_200_000, note: "Plan touches water-service, its water-api client and tea-service.", prUrl: SAMPLE_PRS },
+  { id: "t3", key: "KAN-10", title: "Unknown tea variety returns a server error instead of a clear message", stage: "implement", status: "done", since: now - 86_400_000, note: "Pull requests open in tealeaf-service and tea-service.", prUrl: SAMPLE_PRS },
+  { id: "t4", key: "KAN-5", title: "As a customer, I want a friendly message when the kitchen is slow or down, so I am not left hanging", stage: "research", status: "running", since: now - 600_000 },
 ];

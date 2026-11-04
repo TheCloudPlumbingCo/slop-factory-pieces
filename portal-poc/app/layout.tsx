@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Instrument_Sans, JetBrains_Mono } from "next/font/
 import { auth, signIn, signOut } from "@/auth";
 import { Store } from "@/components/Store";
 import { Shell } from "@/components/Shell";
+import { localUser } from "@/lib/localUser";
 import { githubInfo, liveProviders } from "@/lib/providers/config";
 
 const display = Bricolage_Grotesque({ subsets: ["latin"], variable: "--font-display" });
@@ -13,8 +14,13 @@ export const metadata = { title: "Slop portal" };
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Local preview only: PROTOTYPE_NO_AUTH=1 skips sign-in. Never set on the deployed app.
-  const session = process.env.PROTOTYPE_NO_AUTH ? { user: { name: "Alice (preview)", email: "poc-alice@devhyashodhagmail.onmicrosoft.com" } } : await auth();
+  // Local only: PROTOTYPE_NO_AUTH=1 (sample data) or PORTAL_LOCAL_USER=<name> (real GitHub and Jira) skip Microsoft sign-in.
+  const local = localUser();
+  const session = process.env.PROTOTYPE_NO_AUTH
+    ? { user: { name: "Alice (preview)", email: "poc-alice@devhyashodhagmail.onmicrosoft.com" } }
+    : local
+      ? { user: { name: local, email: "local development, no Microsoft sign-in" } }
+      : await auth();
   const fonts = `${display.variable} ${body.variable} ${mono.variable}`;
 
   if (!session) {

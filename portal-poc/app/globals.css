@@ -121,3 +121,14 @@ h2 { font-size: 1.25rem; }
 .chip button { background: none; border: 0; margin-left: 6px; padding: 0 2px; color: var(--ink-2); font-size: 1rem; line-height: 1; }
 .chip button:hover { color: var(--red); }
 .repopicker .chips { margin-top: 8px; }
+
+/* Attention and metrics (home) */
+.metrics { margin-top: 22px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.metric { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 14px; }
+.metric strong { display: block; font-family: var(--display); font-size: 1.6rem; line-height: 1.2; }
+.metric span { color: var(--ink-2); font-size: 0.85rem; }
+.metric.alert { border-color: var(--amber); }
+.attention { margin-top: 28px; }
+.attention h2 { font-size: 1.05rem; }
+.links { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.linkbtn { text-decoration: none; display: inline-block; }
