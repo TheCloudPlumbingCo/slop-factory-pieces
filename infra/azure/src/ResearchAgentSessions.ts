@@ -1,4 +1,4 @@
-import { AgentSessionMessage, AgentSessions, DeliveryApi, targetOf } from '@slop/core'
+import { AgentSessionMessage, AgentSessions, DeliveryApi, readResearchArgs, targetOf } from '@slop/core'
 import { Context, Effect, Layer, Redacted, Schema } from 'effect'
 
 import type { RepositoryDispatch } from './GithubDispatch'
@@ -15,6 +15,9 @@ export const researchTask = (prompt: string): string | undefined => {
 	const match = /^\s*@\S+\s+\/research(?:\s+([\s\S]*))?$/.exec(prompt)
 	return match === null ? undefined : (match[1] ?? '').trim()
 }
+
+/** A repository named `<team>-workspace` holds research and plans; there `/research` must name a workspace folder. */
+const isWorkspaceRepository = (repository: string) => repository.endsWith('-workspace')
 
 /** GitHub's own answer from a failed dispatch, short enough for a comment. It holds status and message, never a token. */
 const describe = (error: unknown): string => {
@@ -67,7 +70,25 @@ export const researchAgentSessions = (options: ResearchSessionsOptions): Layer.L
 						if (ref === undefined || !('installationId' in ref) || !('owner' in ref)) {
 							return yield* failDelivery('/research works on GitHub issues and pull requests only.')
 						}
-						if (task === '') return yield* failDelivery('Add a task after /research, for example `/research why does CI fail?`.')
+						let workspace: string | undefined
+						let taskText = task
+						if (isWorkspaceRepository(ref.repository)) {
+							const args = readResearchArgs(task)
+							if (args._tag === 'MissingWorkspace') {
+								return yield* failDelivery(
+									'Name the workspace after /research, for example `/research --ws be how does the tea service call water?`. The workspace is a folder under `workspaces/`.',
+								)
+							}
+							if (args._tag === 'InvalidWorkspace') {
+								return yield* failDelivery(
+									`\`${args.value}\` is not a workspace id. Use lowercase letters, digits and dashes, for example \`--ws be\`.`,
+								)
+							}
+							workspace = args.workspace
+							taskText = args.notes
+						} else if (task === '') {
+							return yield* failDelivery('Add a task after /research, for example `/research why does CI fail?`.')
+						}
 						const saved = yield* Effect.tryPromise(() =>
 							options.pending.save({
 								deliveryId: message.deliveryId,
@@ -93,7 +114,8 @@ export const researchAgentSessions = (options: ResearchSessionsOptions): Layer.L
 								repository: ref.repository,
 								eventType: RESEARCH_EVENT_TYPE,
 								clientPayload: {
-									task,
+									task: taskText,
+									...(workspace === undefined ? {} : { workspace }),
 									issueNumber: Number(ref.number),
 									deliveryId: message.deliveryId,
 									brokerOrigin: options.brokerOrigin,

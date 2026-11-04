@@ -8,7 +8,7 @@ import type { RepositoryDispatch } from '../src/GithubDispatch'
 import { makeMemoryPendingResearch } from '../src/PendingResearch'
 import { researchAgentSessions, researchTask } from '../src/ResearchAgentSessions'
 
-const encoded = (prompt: string) =>
+const encoded = (prompt: string, repository = 'web') =>
 	Schema.encodeSync(AgentSessionMessage)(
 		AgentSessionMessage.make({
 			prompt,
@@ -17,7 +17,7 @@ const encoded = (prompt: string) =>
 					installationId: GitHubId.make(7),
 					repositoryId: GitHubId.make(8),
 					owner: 'acme',
-					repository: 'web',
+					repository,
 					number: GitHubId.make(42),
 				}),
 				mailboxKey: 'github:issue:42',
@@ -45,7 +45,7 @@ describe('researchTask', () => {
 
 /** Run `send` over the research sessions with fakes; returns what was dispatched, failed and echoed. */
 const run = (prompt: string, dispatch: (d: RepositoryDispatch) => Promise<void>,
-	pending = makeMemoryPendingResearch(),
+	pending = makeMemoryPendingResearch(), repository = 'web',
 ) =>
 	Effect.gen(function* () {
 		const dispatched: Array<RepositoryDispatch> = []
@@ -67,7 +67,7 @@ const run = (prompt: string, dispatch: (d: RepositoryDispatch) => Promise<void>,
 			fallback,
 		}).pipe(Layer.provide(api))
 		const sessions = Context.get(yield* Layer.build(layer), AgentSessions)
-		yield* sessions.getByName('github:issue:42').send(encoded(prompt))
+		yield* sessions.getByName('github:issue:42').send(encoded(prompt, repository))
 		return { dispatched, failed, echoed, pending }
 	}).pipe(Effect.scoped)
 
@@ -149,6 +149,56 @@ describe('researchAgentSessions', () => {
 			expect(dispatched).toEqual([])
 			expect(failed).toHaveLength(1)
 			expect(JSON.stringify(failed[0])).toContain('Add a task')
+		}),
+	)
+})
+
+describe('researchAgentSessions in a workspace repo', () => {
+	const inWorkspace = (prompt: string) =>
+		run(prompt, async () => {}, makeMemoryPendingResearch(), 'tea-workspace')
+
+	it.effect('dispatches with the workspace id and the notes as the task', () =>
+		Effect.gen(function* () {
+			const { dispatched, failed } = yield* inWorkspace('@slopcodedev /research --ws be how does tea call water?')
+			expect(failed).toEqual([])
+			expect(dispatched).toHaveLength(1)
+			expect(dispatched[0]).toMatchObject({
+				repository: 'tea-workspace',
+				clientPayload: { workspace: 'be', task: 'how does tea call water?', issueNumber: 42 },
+			})
+		}),
+	)
+
+	it.effect('lets the issue be the task when there are no notes', () =>
+		Effect.gen(function* () {
+			const { dispatched, failed } = yield* inWorkspace('@slopcodedev /research --ws ops')
+			expect(failed).toEqual([])
+			expect(dispatched[0]).toMatchObject({ clientPayload: { workspace: 'ops', task: '' } })
+		}),
+	)
+
+	it.effect('fails the delivery with a hint when --ws is missing, without dispatching', () =>
+		Effect.gen(function* () {
+			const { dispatched, failed } = yield* inWorkspace('@slopcodedev /research how does tea call water?')
+			expect(dispatched).toEqual([])
+			expect(failed).toHaveLength(1)
+			expect(JSON.stringify(failed[0])).toContain('--ws')
+		}),
+	)
+
+	it.effect('fails the delivery naming the bad id when --ws is invalid', () =>
+		Effect.gen(function* () {
+			const { dispatched, failed } = yield* inWorkspace('@slopcodedev /research --ws=../x')
+			expect(dispatched).toEqual([])
+			expect(JSON.stringify(failed[0])).toContain('../x')
+		}),
+	)
+
+	it.effect('leaves other repositories alone: --ws stays in the task and no workspace is sent', () =>
+		Effect.gen(function* () {
+			const { dispatched } = yield* run('@slopcodedev /research --ws be x', async () => {})
+			expect(dispatched[0]!.clientPayload).toMatchObject({ task: '--ws be x' })
+			expect(dispatched[0]!.clientPayload).not.toHaveProperty('workspace')
 		}),
 	)
 })
