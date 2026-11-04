@@ -59,6 +59,16 @@ variable "token_encryption_key" {
   default     = ""
   sensitive   = true
 }
+variable "custom_domain" {
+  description = "Stable hostname for the portal, e.g. slopfac.portal.yashodh.space. Empty = use the Azure default host."
+  type        = string
+  default     = ""
+}
+variable "custom_domain_dns_ready" {
+  description = "Set true only after the CNAME and asuid TXT records exist; binds the domain and switches app_url to it."
+  type        = bool
+  default     = false
+}
 variable "image" {
   description = "PUBLIC portal image, e.g. ghcr.io/<you>/portal-poc:1. Empty = placeholder image for the first apply."
   type        = string
@@ -99,8 +109,10 @@ resource "azurerm_container_app_environment" "env" {
 }
 
 locals {
-  app_name = "portal-poc"
-  app_url  = "https://${local.app_name}.${azurerm_container_app_environment.env.default_domain}"
+  app_name     = "portal-poc"
+  default_host = "${local.app_name}.${azurerm_container_app_environment.env.default_domain}"
+  bind_domain  = var.custom_domain != "" && var.custom_domain_dns_ready
+  app_url      = "https://${local.bind_domain ? var.custom_domain : local.default_host}"
 }
 
 resource "azurerm_container_app" "portal" {
@@ -251,4 +263,29 @@ resource "azuread_application_redirect_uris" "web" {
   ]
 }
 
+# Stable hostname: free managed certificate, validated through the CNAME record.
+resource "azurerm_container_app_environment_managed_certificate" "portal" {
+  count                        = local.bind_domain ? 1 : 0
+  name                         = "cert-portal"
+  container_app_environment_id = azurerm_container_app_environment.env.id
+  domain_control_validation    = "CNAME"
+  subject_name                 = var.custom_domain
+}
+
+resource "azurerm_container_app_custom_domain" "portal" {
+  count                                    = local.bind_domain ? 1 : 0
+  name                                     = var.custom_domain
+  container_app_id                         = azurerm_container_app.portal.id
+  container_app_environment_certificate_id = azurerm_container_app_environment_managed_certificate.portal[0].id
+  certificate_binding_type                 = "SniEnabled"
+}
+
 output "portal_url" { value = local.app_url }
+
+# DNS records to create at the DNS host before setting custom_domain_dns_ready = true.
+output "dns_records" {
+  value = var.custom_domain == "" ? null : {
+    cname = { name = var.custom_domain, value = azurerm_container_app.portal.ingress[0].fqdn }
+    txt   = { name = "asuid.${var.custom_domain}", value = azurerm_container_app.portal.custom_domain_verification_id }
+  }
+}

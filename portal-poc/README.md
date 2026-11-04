@@ -31,16 +31,22 @@ Generate the encryption key (keep it out of git; losing it makes stored connecti
 openssl rand -base64 32
 ```
 
+## Stable hostname
+
+The portal is served at `https://slopfac.portal.yashodh.space` (Terraform variable `custom_domain`), so the callback URLs below do not change when the Container Apps environment is recreated. Setup: `terraform apply -var custom_domain=slopfac.portal.yashodh.space`, create the `CNAME` and `asuid` `TXT` records from `terraform output dns_records` at the DNS host, then apply again with `-var custom_domain_dns_ready=true`. The managed-certificate flow has not been run against Azure yet.
+
+Scopes and permissions for GitHub and Jira are listed in `../docs/portal-provider-permissions.md`.
+
 ## Register the GitHub App
 
 GitHub Settings > Developer settings > GitHub Apps > New GitHub App.
 
 - Callback URLs (add both):
   - `http://localhost:3000/api/connect/github/callback`
-  - `https://portal-poc.victoriousrock-79df929a.southeastasia.azurecontainerapps.io/api/connect/github/callback`
+  - `https://slopfac.portal.yashodh.space/api/connect/github/callback`
 - Expire user authorization tokens: leave enabled (the portal refreshes them).
 - Request user authorization (OAuth) during installation: not needed. Webhook: untick Active.
-- Repository permissions: Metadata (read-only) is mandatory. Add Contents (read-only) so the agent can read code later.
+- Repository permissions: Metadata (read-only) is mandatory. Pull requests (read-only) is needed for the review-requests list (not yet verified against a real app). Contents (read-only) is optional, for the agent to read code later. Full list: `../docs/portal-provider-permissions.md`.
 - Where can this app be installed: choose per your needs.
 - Create the app, generate a client secret, copy the Client ID (not the App ID) and the secret into `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`.
 - Install the app on the organisations/accounts whose repos should be selectable. The portal lists only repos from installations the signed-in user can access.
@@ -51,7 +57,7 @@ developer.atlassian.com/console/myapps > Create > OAuth 2.0 integration.
 
 - Authorization > OAuth 2.0 (3LO) > Callback URL (the console may accept only one URL; if so, register one app per environment):
   - `http://localhost:3000/api/connect/jira/callback`
-  - `https://portal-poc.victoriousrock-79df929a.southeastasia.azurecontainerapps.io/api/connect/jira/callback`
+  - `https://slopfac.portal.yashodh.space/api/connect/jira/callback`
 - Permissions > add Jira API, then configure the granular scopes `read:issue-details:jira`, `read:audit-log:jira`, `read:avatar:jira`, `read:field-configuration:jira`, `read:issue-meta:jira` (what Atlassian's API spec lists for issue search, state Beta) plus `read:me` under the User identity API. The classic `read:jira-work` also works if your console offers it; then set `ATLASSIAN_SCOPES="read:jira-work read:me offline_access"`. `offline_access` is requested at sign-in and gives the refresh token.
 - Settings > copy Client ID and Secret into `ATLASSIAN_CLIENT_ID` / `ATLASSIAN_CLIENT_SECRET`.
 - Distribution: set to Sharing before people outside your own account can connect.
