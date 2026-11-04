@@ -1,15 +1,13 @@
-# pi/ (placeholder)
+# pi (placeholder)
 
-**Role:** the simple agent, plus its sandbox and tools.
+This folder will hold the real agent. It is not built.
 
-**Will contain (not yet built):**
-- A Pi Durable agent that runs per PR (conversation id = the PR) with no client attached
-- A tiny tool set: `write_file`, `read_file`, `list_files` (guess)
-- A sandbox/filesystem port so the implementation can be swapped (virtual filesystem, container, other)
-- A small client for the delivery API: activity, then complete or fail, using `deliveryId` and `accessToken`
+Planned:
+- A Pi Durable agent. One agent for each pull request.
+- A small tool set: write, read, and list files.
+- A sandbox port. The sandbox implementation can change.
+- A client for the delivery API.
 
-**Uses:** `@earendil-works/pi-durable` (experimental). Reference: `~/Projects/pi-durable-chat` (`src/agent/ports.ts` for what a runtime must provide, `src/adapters/cloudflare/` for the Durable Object mapping).
+Today the echo agent in `packages/core` does this work.
 
-**Note:** Pi has no sandbox or filesystem tools today; those are ours to add.
-
-**Open:** can Pi run headlessly, where does per-PR state live, scripted vs real model call. See `../docs/06-starter-design-notes.md`.
+Open questions: see `docs/06-starter-design-notes.md`.

@@ -1,38 +1,45 @@
-# slop-code-factory (plumbing starter)
+# slop-code-factory
 
-A learning project. Goal: understand the plumbing that connects a GitHub comment to a long-running agent and back, using the [`effect-channels`](../effect-channels) SDK as the broker.
+A learning project. It shows how a GitHub comment or Jira comment reaches a long-running agent, and how the answer returns.
 
-**Not a goal:** a useful agent. No code reviews, no development tasks, no finished work. The agent does the simplest possible thing and acknowledges it on GitHub.
+The `effect-channels` SDK is the broker. The agent is an echo stub. A useful agent is not a goal.
 
-## Status
-
-Skeleton only. Docs and placeholders. Nothing is implemented, nothing is installed, nothing is deployed.
-
-## Layout
-
-```text
-docs/              # the discussion that led here, written up (start at docs/README.md)
-cloudfare/         # PLACEHOLDER: broker on Cloudflare (Channels SDK + GitHub provider)
-pi/                # PLACEHOLDER: the simple agent (Pi Durable) and its sandbox/tools
-github-app/        # PLACEHOLDER: GitHub App "slop-code-factory" settings and manifest
-scripts/           # pre-existing Copilot SDK scripts, unrelated to this plan
-```
-
-`cloudfare/` keeps its original spelling because the directory already existed.
-
-## The idea in one picture
+## Flow
 
 ```mermaid
 flowchart LR
-  GH[GitHub comment] -->|webhook| B[Broker<br/>Channels SDK on Cloudflare]
-  B -->|start job + deliveryId + token| A[Agent<br/>Pi Durable + sandbox]
-  A -->|delivery API: progress, answer| B
-  B -->|post comment, reactions| GH
+  GH[GitHub or Jira comment] -->|webhook| B[Broker]
+  B -->|start job| A[Agent]
+  A -->|delivery API| B
+  B -->|reply| GH
 ```
 
-## Reading order
+## Status
+
+| Part | State |
+|---|---|
+| Cloudflare broker | Built. Tests pass. |
+| AWS control layer | Built. Tests pass. |
+| Azure control layer | Built. Tests pass against fakes. Not deployed. |
+| Portal prototype | Built. Some parts are simulated. |
+| Real agent (Pi) | Not built. |
+
+## Layout
+
+| Path | Contents |
+|---|---|
+| `packages/core` | Shared bot logic. No cloud imports. |
+| `infra/cloudfare` | Cloudflare broker. The folder name keeps its original spelling. |
+| `infra/aws` | AWS control layer (Terraform). |
+| `infra/azure` | Azure control layer (Terraform). |
+| `channels/github-app` | GitHub App setup. |
+| `agents/pi` | Placeholder for the real agent. |
+| `portal-poc` | Portal prototype (Next.js). |
+| `examples/copilot-sdk` | Copilot SDK scripts. Not related to the plan. |
+| `docs` | Documents. Start at `docs/README.md`. |
+
+## Read first
 
 1. [`docs/01-purpose-and-scope.md`](docs/01-purpose-and-scope.md)
-2. [`docs/02-sdk-overview.md`](docs/02-sdk-overview.md)
-3. [`docs/04-architecture.md`](docs/04-architecture.md)
-4. [`docs/06-starter-design-notes.md`](docs/06-starter-design-notes.md) for the open questions
+2. [`docs/04-architecture.md`](docs/04-architecture.md)
+3. [`docs/07-roadmap.md`](docs/07-roadmap.md)
