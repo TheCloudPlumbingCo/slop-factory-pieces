@@ -13,7 +13,7 @@
 
 **Uses:** `@humanlayer/channels-delivery`, `-github`, `-alchemy-cloudflare` (published 0.1.0) and `-jira` (vendored tarball, see below).
 
-**Boundaries:** B1, B2, B3, B4, B6 are the SDK's. B5 (how the callback starts the agent) is defined here. See `../docs/04-architecture.md`.
+**Boundaries:** B1, B2, B3, B4, B6 are the SDK's. B5 (how the callback starts the agent) is defined here. See `../../docs/architecture.md`.
 
 ## Configuration
 

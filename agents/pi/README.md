@@ -10,4 +10,4 @@ Planned:
 
 Today the echo agent in `packages/core` does this work.
 
-Open questions: see `docs/06-starter-design-notes.md`.
+Scope: see `docs/purpose-and-scope.md`.

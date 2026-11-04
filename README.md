@@ -40,6 +40,5 @@ flowchart LR
 
 ## Read first
 
-1. [`docs/01-purpose-and-scope.md`](docs/01-purpose-and-scope.md)
-2. [`docs/04-architecture.md`](docs/04-architecture.md)
-3. [`docs/07-roadmap.md`](docs/07-roadmap.md)
+1. [`docs/purpose-and-scope.md`](docs/purpose-and-scope.md)
+2. [`docs/architecture.md`](docs/architecture.md)
