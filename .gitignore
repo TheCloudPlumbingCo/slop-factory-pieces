@@ -3,3 +3,6 @@ node_modules
 .superpowers
 .alchemy
 .claude
+
+# Local visual aids for planning and concept discussions.
+/.local-artifacts/

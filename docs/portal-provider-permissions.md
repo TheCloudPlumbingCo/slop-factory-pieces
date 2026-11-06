@@ -1,5 +1,7 @@
 # Portal: GitHub and Jira app permissions
 
+For identity rationale, credential flows, and approval gaps, read the [identity risk review](11-identity-and-integration-risk-review.md).
+
 What `portal-poc` needs from the GitHub App, the GitHub OAuth App and the Atlassian (Jira) OAuth app. Derived from `portal-poc/lib/providers/github.ts` and `jira.ts`. Update this page whenever those files change what they request.
 
 ## Callback URLs (all three apps)
@@ -20,10 +22,10 @@ GitHub Settings, Developer settings, GitHub Apps. A GitHub App has no OAuth scop
 | Permission | Access | Why | Status |
 | --- | --- | --- | --- |
 | Metadata | Read-only | Mandatory for every GitHub App. Lets the portal list repositories (`/user/installations/{id}/repositories`). | Required |
-| Pull requests | Read-only | The review-requests list searches `is:pr review-requested:@me` through `/search/issues`. | Required, verify |
+| Pull requests | Read-only | Candidate grant for private review data; search endpoint documentation specifies no additional fine-grained permission. | Verify minimum with private repo tests |
 | Contents | Read-only | Lets the agent read code later. The portal does not call it today. | Optional |
 
-> **Verify:** the earlier README listed only Metadata and Contents. The review-requests code calls the search API, which very likely needs Pull requests (read) for a GitHub App user token. This has not been tested against a real app. If the list comes back empty, check this permission first.
+> **Verify:** do not present Pull requests read as a proven search requirement. Confirm the minimum installation grants with private review results. See [GitHub search documentation](https://docs.github.com/en/rest/search/search#search-issues-and-pull-requests).
 
 ### Account permissions
 
@@ -56,7 +58,7 @@ GitHub Settings, Developer settings, OAuth Apps. Access is controlled by scopes 
 | Authorization callback URL | One URL only: `https://slopfac.portal.yashodh.space/api/connect/github/callback` |
 | Credentials | Client ID and secret into `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` |
 
-> **Organisation approval:** organisations that restrict third-party OAuth apps hide their repos until an owner approves the app. OAuth tokens do not expire. Public repos only would need just `public_repo`, but the code does not request that.
+> **Organisation approval:** organisations can restrict OAuth app access. Confirm token expiry from the registration and issued response. GitHub supports expiring OAuth App tokens. Public repos only would need just `public_repo`, but the code does not request that.
 
 ## Jira (Atlassian OAuth 2.0, 3LO)
 

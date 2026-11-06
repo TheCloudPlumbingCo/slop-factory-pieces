@@ -2,6 +2,12 @@
 
 Next.js 15 prototype portal. Sign-in is Microsoft Entra (Auth.js). GitHub and Jira can be connected per user with real OAuth; research triggering, the pipeline board and workspaces are still simulated.
 
+Design direction: [workflow and portal rationale](../docs/10-workflow-and-portal-rationale.md).
+
+Information and risk review: [identity and integration review](../docs/11-identity-and-integration-risk-review.md).
+
+Formal assessment document: [Agent Workflow Automation: Identity, Access and Integration Architecture](../docs/14-agent-workflow-automation-architecture.md).
+
 ## Run locally
 
 ```bash
@@ -84,8 +90,8 @@ One deployment uses one GitHub mode, so you can deploy each and compare. Switch 
 |---|---|---|
 | What you register | A GitHub App | A GitHub OAuth App |
 | Repos the portal can list | Only repos where the App is installed | Every repo the user can access, private included |
-| Scope asked | App permissions (Metadata and Contents, read) | `read:user repo` |
-| Token lifetime | Expires (8 hours by default) and refreshes | Does not expire |
+| Scope asked | App permissions; Contents is not used by current portal reads | `read:user repo` |
+| Token lifetime | Expiry depends on app settings; code supports refresh | Confirm issued expiry; expiring OAuth App tokens are supported by GitHub |
 | Repo listing call | `/user/installations/{id}/repositories` | `/user/repos` |
 | PKCE sent | Yes | No (not verified for OAuth Apps) |
 

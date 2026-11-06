@@ -22,3 +22,7 @@
 - Narrow tokens for the agent. The agent must not use the full GitHub App token.
 
 Portal app permissions: [portal-provider-permissions](portal-provider-permissions.md).
+
+For implementation evidence and approval gaps, read the [identity integration review](11-identity-and-integration-risk-review.md).
+
+For Information Risk review, read the [formal architecture assessment](14-agent-workflow-automation-architecture.md).
