@@ -2,6 +2,8 @@
 
 For Information Risk review, start with [Agent Workflow Automation: Identity, Access and Integration Architecture](14-agent-workflow-automation-architecture.md).
 
+For interaction terminology, read [Channel-Based Invocation and Portal Access](15-channel-invocation-and-portal-access.md).
+
 For workflow direction, read the [workflow and portal rationale](10-workflow-and-portal-rationale.md).
 
 | Document | Contents |
@@ -15,7 +17,8 @@ For workflow direction, read the [workflow and portal rationale](10-workflow-and
 | [11-identity-and-integration-risk-review](11-identity-and-integration-risk-review.md) | Identity roles, credential flows, provider permissions, and approval gaps |
 | [12-live-integration-permissions](12-live-integration-permissions.md) | Live grants, requested OAuth scopes, repo boundaries, and approval decisions |
 | [13-broker-workflow-wiring](13-broker-workflow-wiring.md) | App-authenticated dispatch, runner credentials, and OIDC callbacks |
-| [14-agent-workflow-automation-architecture](14-agent-workflow-automation-architecture.md) | Formal Information Risk assessment and approval requirements |
+| [14-agent-workflow-automation-architecture](14-agent-workflow-automation-architecture.md) | IRA access request: each identity's purpose, integration role, permissions, and approval boundaries |
+| [15-channel-invocation-and-portal-access](15-channel-invocation-and-portal-access.md) | Plain explanation of channel invocation, the supplementary portal, and their credential roles |
 
 
 ## HTML artifacts

@@ -14,4 +14,5 @@ For structural codebase exploration, use the installed `codebase-memory` skill.
 - Do not use terminal output as the explanation. Open the artifact in a browser when permitted. Provide a direct artifact link.
 - Keep concept and planning HTML artifacts in `.local-artifacts/`, which Git ignores. Maintain them separately from repository documentation.
 - Write durable repository documentation in Markdown. Include Mermaid diagrams where useful. Do not link repository docs to ignored local HTML files.
+- Write IRA submission documents as access requests: identity, use, reason, permissions, and boundaries. Explain channel and portal terminology separately. Exclude live organisation names, repo inventories, identifiers, and deployment audit findings from the submission.
 - These preferences were explicitly requested by the user on 2026-11-06.

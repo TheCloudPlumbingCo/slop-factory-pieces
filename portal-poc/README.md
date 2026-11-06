@@ -6,7 +6,9 @@ Design direction: [workflow and portal rationale](../docs/10-workflow-and-portal
 
 Information and risk review: [identity and integration review](../docs/11-identity-and-integration-risk-review.md).
 
-Formal assessment document: [Agent Workflow Automation: Identity, Access and Integration Architecture](../docs/14-agent-workflow-automation-architecture.md).
+IRA access request: [Agent Workflow Automation: Identity, Access and Integration Architecture](../docs/14-agent-workflow-automation-architecture.md).
+
+Interaction terminology: [Channel-Based Invocation and Portal Access](../docs/15-channel-invocation-and-portal-access.md).
 
 ## Run locally
 
