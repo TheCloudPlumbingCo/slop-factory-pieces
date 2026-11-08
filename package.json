@@ -4,7 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy:broker": "bash infra/azure/scripts/deploy.sh",
+    "deploy:broker:plan": "bash infra/azure/scripts/deploy.sh --plan",
+    "deploy:portal": "bash portal/scripts/deploy.sh",
+    "deploy:portal:plan": "bash portal/scripts/deploy.sh --plan"
   },
   "keywords": [],
   "author": "",
