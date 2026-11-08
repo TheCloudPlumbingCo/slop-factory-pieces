@@ -2,7 +2,7 @@ import { generateKeyPairSync } from 'node:crypto'
 
 import { describe, expect, it } from 'vitest'
 
-import { appJwt, dispatchRepositoryEvent } from '../src/GithubDispatch'
+import { appJwt, dispatchRepositoryEvent, installationToken } from '../src/GithubDispatch'
 
 const { privateKey } = generateKeyPairSync('rsa', {
 	modulusLength: 2048,
@@ -59,6 +59,8 @@ describe('dispatchRepositoryEvent', () => {
 		])
 		await dispatchRepositoryEvent(credentials, dispatch, fetchImpl, 1_700_000_000_000)
 		expect(calls[0]!.url).toBe('https://api.github.com/app/installations/7/access_tokens')
+		// The dispatch asks for the App's full permissions, as it always did: no body on the token request.
+		expect(calls[0]!.init.body).toBeUndefined()
 		expect(calls[1]!.url).toBe('https://api.github.com/repos/acme/web/dispatches')
 		expect((calls[1]!.init.headers as Record<string, string>).authorization).toBe('Bearer inst-token')
 		expect(JSON.parse(calls[1]!.init.body as string)).toEqual({
@@ -80,5 +82,24 @@ describe('dispatchRepositoryEvent', () => {
 		await expect(dispatchRepositoryEvent(credentials, dispatch, fetchImpl)).rejects.toThrow(
 			/403.*not accessible.*issues=write, metadata=read/,
 		)
+	})
+})
+
+describe('installationToken', () => {
+	it('narrows the token to the permissions asked for', async () => {
+		const { calls, fetchImpl } = fakeFetch([new Response(JSON.stringify({ token: 'narrow' }), { status: 201 })])
+		const result = await installationToken(credentials, 7, {
+			permissions: { organization_projects: 'write' },
+			fetchImpl,
+			nowMs: 1_700_000_000_000,
+		})
+		expect(result.token).toBe('narrow')
+		expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ permissions: { organization_projects: 'write' } })
+		expect((calls[0]!.init.headers as Record<string, string>)['content-type']).toBe('application/json')
+	})
+
+	it('throws with the status when GitHub refuses the narrower permissions', async () => {
+		const { fetchImpl } = fakeFetch([new Response('permissions not granted', { status: 422 })])
+		await expect(installationToken(credentials, 7, { permissions: { organization_projects: 'write' }, fetchImpl })).rejects.toThrow(/422/)
 	})
 })

@@ -45,17 +45,6 @@ jobs:
         with:
           path: workspace
 
-      - name: Token to move the board card
-        id: board
-        continue-on-error: true
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          permission-organization-projects: write
-          permission-issues: read
-
       - name: Token to read the workspace's repos
         id: read
         uses: actions/create-github-app-token@v1
@@ -96,7 +85,6 @@ jobs:
           copilot-token: ${{ secrets.COPILOT_GITHUB_TOKEN }}
           read-token: ${{ steps.read.outputs.token }}
           publish-token: ${{ steps.publish.outputs.token }}
-          board-token: ${{ steps.board.outputs.token }}
           # Sent by the broker. A manual dispatch has neither, and then no report is sent.
           broker-origin: ${{ github.event.client_payload.brokerOrigin }}
           delivery-id: ${{ github.event.client_payload.deliveryId }}

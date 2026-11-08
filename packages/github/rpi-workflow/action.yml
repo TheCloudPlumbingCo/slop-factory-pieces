@@ -1,6 +1,6 @@
 name: Slop factory workspace run
 description: >
-  Runs one command in a workspace repo: checks the workspace, moves the board card, downloads the workspace's repos
+  Runs one command in a workspace repo: checks the workspace, downloads the workspace's repos
   read-only, runs the agent, and posts the result on the workspace issue. Call it through the reusable workflow
   .github/workflows/workspace.yml. It needs the workspace repo checked out first.
 
@@ -35,9 +35,6 @@ inputs:
   publish-token:
     description: Token with issues write and pull requests write on the workspace repo.
     required: true
-  board-token:
-    description: Token with organisation Projects write. Optional. Without it the card does not move.
-    default: ''
   broker-origin:
     description: The broker's https origin from the dispatch payload. Optional. With delivery-id it sends the final report.
     default: ''
@@ -77,22 +74,6 @@ runs:
         WS: ${{ inputs.workspace }}
         WORKSPACE_DIR: ${{ inputs.workspace-dir }}
       run: bash "${{ github.action_path }}/scripts/check-workspace.sh"
-
-    - name: Move the card
-      if: inputs.board-token != '' && steps.repeat.outputs.skip != 'true'
-      shell: bash
-      continue-on-error: true
-      env:
-        GH_TOKEN: ${{ inputs.board-token }}
-        WS: ${{ inputs.workspace }}
-        WORKSPACE_DIR: ${{ inputs.workspace-dir }}
-      run: |
-        project=$(jq -r '.project // empty' "$WORKSPACE_DIR/workspaces/$WS/workspace.json")
-        if [ -n "$project" ]; then
-          bash "${{ github.action_path }}/scripts/move-card.sh" "${{ inputs.issue }}" "${{ steps.command.outputs.card-status }}" "$project"
-        else
-          echo "workspace.json has no project number; the card does not move."
-        fi
 
     - name: Download the workspace's repos
       if: steps.repeat.outputs.skip != 'true'

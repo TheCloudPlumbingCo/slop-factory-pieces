@@ -1,8 +1,8 @@
 import { describe, expect, it } from '@effect/vitest'
 import { DeliveryId, type DeliveryClient } from '@humanlayer/channels-delivery'
 import { GitHubId, GitHubIssue, GitHubIssueRef } from '@humanlayer/channels-github'
-import { AgentSessionMessage, AgentSessions, DeliveryApi } from '@slop/core'
-import { Context, Effect, Layer, Redacted, Schema } from 'effect'
+import { AgentSessionMessage, AgentSessions, CardMover, DeliveryApi } from '@slop/core'
+import { Context, Deferred, Effect, Layer, Redacted, Schema } from 'effect'
 
 import type { RepositoryDispatch } from '../src/GithubDispatch'
 import { makeMemoryPendingResearch } from '../src/PendingResearch'
@@ -45,7 +45,7 @@ describe('researchTask', () => {
 
 /** Run `send` over the research sessions with fakes; returns what was dispatched, failed and echoed. */
 const run = (prompt: string, dispatch: (d: RepositoryDispatch) => Promise<void>,
-	pending = makeMemoryPendingResearch(), repository = 'web',
+	pending = makeMemoryPendingResearch(), repository = 'web', cardMover?: Layer.Layer<CardMover>,
 ) =>
 	Effect.gen(function* () {
 		const dispatched: Array<RepositoryDispatch> = []
@@ -65,6 +65,7 @@ const run = (prompt: string, dispatch: (d: RepositoryDispatch) => Promise<void>,
 			brokerOrigin: 'https://broker.example',
 			pending,
 			fallback,
+			...(cardMover === undefined ? {} : { cardMover }),
 		}).pipe(Layer.provide(api))
 		const sessions = Context.get(yield* Layer.build(layer), AgentSessions)
 		yield* sessions.getByName('github:issue:42').send(encoded(prompt, repository))
@@ -200,6 +201,111 @@ describe('researchAgentSessions in a workspace repo', () => {
 			const { dispatched } = yield* run('@slopcodedev /research --ws be x', async () => {})
 			expect(dispatched[0]!.clientPayload).toMatchObject({ task: '--ws be x' })
 			expect(dispatched[0]!.clientPayload).not.toHaveProperty('workspace')
+		}),
+	)
+})
+
+/** A fake board: records what the sessions ask for. `number` is what `projectNumber` answers. */
+const fakeBoard = (options: { readonly number?: number | undefined; readonly projectNumber?: Effect.Effect<number | undefined>; readonly moveCard?: Effect.Effect<void> } = {}) => {
+	const asked: Array<unknown> = []
+	const moved: Array<unknown> = []
+	const done = Effect.runSync(Deferred.make<void>())
+	const layer = Layer.succeed(
+		CardMover,
+		CardMover.of({
+			projectNumber: (input) =>
+				Effect.sync(() => void asked.push(input)).pipe(Effect.andThen(options.projectNumber ?? Effect.succeed('number' in options ? options.number : 4))),
+			moveCard: (input) =>
+				Effect.sync(() => void moved.push(input)).pipe(
+					Effect.andThen(options.moveCard ?? Effect.void),
+					Effect.ensuring(Deferred.succeed(done, undefined)),
+				),
+		}),
+	)
+	return { layer, asked, moved, done }
+}
+
+/** Let background fibers run. They need no time, only a turn. */
+const settle = Effect.gen(function* () {
+	for (let turn = 0; turn < 20; turn++) yield* Effect.yieldNow
+})
+
+describe('the card moves at hand-off', () => {
+	const prompt = '@slopcodebot /research --ws be'
+
+	it.effect('moves the card to Research after GitHub accepts the dispatch', () =>
+		Effect.gen(function* () {
+			const board = fakeBoard()
+			const { dispatched } = yield* run(prompt, async () => {}, undefined, 'team-workspace', board.layer)
+			yield* Deferred.await(board.done)
+			expect(dispatched).toHaveLength(1)
+			expect(board.asked).toEqual([{ installationId: 7, owner: 'acme', repository: 'team-workspace', workspace: 'be' }])
+			expect(board.moved).toEqual([
+				{ installationId: 7, owner: 'acme', repository: 'team-workspace', issueNumber: 42, projectNumber: 4, column: 'Research' },
+			])
+		}),
+	)
+
+	it.effect('does not move the card when GitHub refuses the dispatch', () =>
+		Effect.gen(function* () {
+			const board = fakeBoard()
+			yield* run(prompt, async () => { throw new Error('403') }, undefined, 'team-workspace', board.layer)
+			yield* settle
+			expect(board.asked).toEqual([])
+			expect(board.moved).toEqual([])
+		}),
+	)
+
+	it.effect('does not move the card for a repository that is not a workspace', () =>
+		Effect.gen(function* () {
+			const board = fakeBoard()
+			const { dispatched } = yield* run('@slopcodebot /research why does CI fail?', async () => {}, undefined, 'web', board.layer)
+			yield* settle
+			expect(dispatched).toHaveLength(1)
+			expect(board.asked).toEqual([])
+			expect(board.moved).toEqual([])
+		}),
+	)
+
+	it.effect('does not move the card when the workspace has no board', () =>
+		Effect.gen(function* () {
+			const board = fakeBoard({ number: undefined })
+			yield* run(prompt, async () => {}, undefined, 'team-workspace', board.layer)
+			yield* settle
+			expect(board.asked).toHaveLength(1)
+			expect(board.moved).toEqual([])
+		}),
+	)
+
+	it.effect('does not fail the delivery when the move dies', () =>
+		Effect.gen(function* () {
+			const board = fakeBoard({ moveCard: Effect.die(new Error('boom')) })
+			const { dispatched, failed } = yield* run(prompt, async () => {}, undefined, 'team-workspace', board.layer)
+			yield* Deferred.await(board.done)
+			yield* settle
+			expect(dispatched).toHaveLength(1)
+			expect(failed).toEqual([])
+		}),
+	)
+
+	it.effect('does not wait for the move before the send returns', () =>
+		Effect.gen(function* () {
+			const board = fakeBoard({ projectNumber: Effect.never })
+			const { dispatched, failed } = yield* run(prompt, async () => {}, undefined, 'team-workspace', board.layer)
+			// The board never answers. Reaching this line shows the send did not wait for it.
+			expect(dispatched).toHaveLength(1)
+			expect(failed).toEqual([])
+			yield* settle
+			expect(board.asked).toHaveLength(1)
+			expect(board.moved).toEqual([])
+		}),
+	)
+
+	it.effect('works without a board', () =>
+		Effect.gen(function* () {
+			const { dispatched, failed } = yield* run(prompt, async () => {}, undefined, 'team-workspace')
+			expect(dispatched).toHaveLength(1)
+			expect(failed).toEqual([])
 		}),
 	)
 })

@@ -521,8 +521,8 @@ describe('resolve-command.sh', () => {
 		return { code: result.status, output: read(out), status: read(join(tmp, 'status')).trim(), message: read(join(tmp, 'result.md')) }
 	}
 
-	it('maps research to the Research column', () => {
-		expect(resolve('research')).toMatchObject({ code: 0, output: 'card-status=Research\n', status: '' })
+	it('accepts research and names no board column (the broker owns the card states)', () => {
+		expect(resolve('research')).toMatchObject({ code: 0, output: '', status: '' })
 	})
 
 	it('says a known phase is not supported yet', () => {

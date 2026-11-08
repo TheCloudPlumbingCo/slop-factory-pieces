@@ -48,6 +48,14 @@ The Container App gets these settings from Terraform:
 
 Terraform does not create the secrets. Create them in the Key Vault with the names `GITHUB-WEBHOOK-SECRET`, `GITHUB-BOT-MENTION-NAME`, `GITHUB-BOT-USER-ID`, `GITHUB-APP-ID`, `GITHUB-PRIVATE-KEY` (dashes, not underscores).
 
+### The board card
+
+The broker moves the card on the workspace's project board. The workflow does not. After GitHub accepts a dispatch for a workspace, the broker looks up the next column in `packages/core/src/CardStates.ts` (today: `research` and `HandedOff` give `Research`). It reads the project number from `workspaces/<id>/workspace.json` in the workspace repo.
+
+The move runs in the background. A problem is logged and never fails the delivery. If the app stops at that moment, the card does not move.
+
+The GitHub App must hold these permissions for the move: **Contents: read**, **Issues: read**, and the organisation permission **Projects: write**. The broker asks for a token with only the ones each call needs. If the App lacks one, GitHub refuses the token and the log says `could not move the card` or `could not read workspace.json`.
+
 The app uses a user-assigned identity. Its roles must exist before the app reads the secrets. A system-assigned identity exists only after the app, so it would deadlock.
 
 ## Deploying
