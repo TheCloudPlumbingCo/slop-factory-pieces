@@ -16,6 +16,8 @@ App settings, set by Terraform: `COSMOS_ENDPOINT`, `COSMOS_DATABASE`, `COSMOS_CO
 
 ## Deploying
 
+From the repo root, `npm run deploy:broker:plan` bundles and plans without changing Azure. `npm run deploy:broker` plans, asks, and applies. The portal has the same pair: `deploy:portal:plan` and `deploy:portal`. The steps below are what the broker script does, plus the one-time setup.
+
 Run from `infra/azure` unless noted. These steps are from the tools' documentation and have not been run.
 
 1. `az login`, and `az account set --subscription <id>`.
