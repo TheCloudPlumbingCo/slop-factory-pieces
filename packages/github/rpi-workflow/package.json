@@ -1,0 +1,10 @@
+{
+	"name": "@slop/rpi-workflow",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"description": "GitHub Action and scripts that run a slop factory command in a workspace repo.",
+	"scripts": {
+		"test": "vitest --run"
+	}
+}

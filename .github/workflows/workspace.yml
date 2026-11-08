@@ -1,0 +1,95 @@
+# Reusable workflow for a workspace repo. An organisation calls it with a small file; see
+# packages/github/rpi-workflow/README.md. It owns the runner, the timeout, the concurrency rule and the tokens,
+# and leaves the stages to the Action in packages/github/rpi-workflow.
+name: slop factory workspace run
+
+on:
+  workflow_call:
+    inputs:
+      app-id:
+        description: The slop factory GitHub App ID. Defaults to the repository variable APP_ID.
+        type: string
+        required: false
+        default: ''
+      model:
+        description: Copilot model id for the agent. Empty uses the CLI default. Use a light model for tests.
+        type: string
+        required: false
+        default: ''
+    secrets:
+      APP_PRIVATE_KEY:
+        description: The GitHub App private key.
+        required: true
+      COPILOT_GITHUB_TOKEN:
+        description: Token the Copilot CLI signs in with.
+        required: true
+
+# One run per issue at a time. A second request waits.
+concurrency:
+  group: slopfactory-workspace-${{ github.event.client_payload.issueNumber }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_ID: ${{ inputs.app-id || vars.APP_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: workspace
+
+      - name: Token to move the board card
+        id: board
+        continue-on-error: true
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-organization-projects: write
+          permission-issues: read
+
+      - name: Token to read the workspace's repos
+        id: read
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          permission-contents: read
+
+      # The organisation may not let the workflow's own token open pull requests or comment as the app.
+      - name: Token to open the pull request and comment
+        id: publish
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-pull-requests: write
+          permission-issues: write
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # A reusable workflow cannot use a local path for an Action: it would point into the caller's repo.
+      # TEMPORARY: this branch ref is for testing. Change it to @main, then @v1 once the tag exists, before merging.
+      - uses: TheCloudPlumbingCo/slop-factory-pieces/packages/github/rpi-workflow@rpi-workflow-action
+        with:
+          workspace: ${{ github.event.client_payload.workspace }}
+          issue: ${{ github.event.client_payload.issueNumber }}
+          task: ${{ github.event.client_payload.task }}
+          default-branch: ${{ github.event.repository.default_branch }}
+          model: ${{ inputs.model }}
+          copilot-token: ${{ secrets.COPILOT_GITHUB_TOKEN }}
+          read-token: ${{ steps.read.outputs.token }}
+          publish-token: ${{ steps.publish.outputs.token }}
+          board-token: ${{ steps.board.outputs.token }}

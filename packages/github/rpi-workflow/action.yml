@@ -1,0 +1,96 @@
+name: Slop factory workspace run
+description: >
+  Runs one command in a workspace repo: checks the workspace, moves the board card, downloads the workspace's repos
+  read-only, runs the agent, and posts the result on the workspace issue. Call it through the reusable workflow
+  .github/workflows/workspace.yml. It needs the workspace repo checked out first.
+
+inputs:
+  workspace:
+    description: Workspace id, a folder under workspaces/.
+    required: true
+  issue:
+    description: The workspace issue number. The result is posted there.
+    required: true
+  task:
+    description: What to research. When empty, the issue title and body are used.
+    default: ''
+  workspace-dir:
+    description: Where the workspace repo is checked out.
+    default: workspace
+  default-branch:
+    description: The workspace repo's default branch. The research pull request targets it.
+    default: main
+  card-status:
+    description: Board column to move the card to when the run starts. The board number comes from workspace.json.
+    default: Research
+  model:
+    description: Copilot model id for the agent. Empty uses the CLI default.
+    default: ''
+  copilot-token:
+    description: Token the Copilot CLI uses to sign in.
+    required: true
+  read-token:
+    description: Token with contents read on the workspace's repos.
+    required: true
+  publish-token:
+    description: Token with issues write and pull requests write on the workspace repo.
+    required: true
+  board-token:
+    description: Token with organisation Projects write. Optional. Without it the card does not move.
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Check the workspace
+      shell: bash
+      env:
+        WS: ${{ inputs.workspace }}
+        WORKSPACE_DIR: ${{ inputs.workspace-dir }}
+      run: bash "${{ github.action_path }}/scripts/check-workspace.sh"
+
+    - name: Move the card
+      if: inputs.board-token != ''
+      shell: bash
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ inputs.board-token }}
+        WS: ${{ inputs.workspace }}
+        WORKSPACE_DIR: ${{ inputs.workspace-dir }}
+      run: |
+        project=$(jq -r '.project // empty' "$WORKSPACE_DIR/workspaces/$WS/workspace.json")
+        if [ -n "$project" ]; then
+          bash "${{ github.action_path }}/scripts/move-card.sh" "${{ inputs.issue }}" "${{ inputs.card-status }}" "$project"
+        else
+          echo "workspace.json has no project number; the card does not move."
+        fi
+
+    - name: Download the workspace's repos
+      shell: bash
+      env:
+        WS: ${{ inputs.workspace }}
+        WORKSPACE_DIR: ${{ inputs.workspace-dir }}
+        READ_TOKEN: ${{ inputs.read-token }}
+      run: bash "${{ github.action_path }}/scripts/clone-repos.sh"
+
+    - name: Run the agent
+      shell: bash
+      env:
+        WS: ${{ inputs.workspace }}
+        TASK: ${{ inputs.task }}
+        ISSUE: ${{ inputs.issue }}
+        COPILOT_GITHUB_TOKEN: ${{ inputs.copilot-token }}
+        MODEL: ${{ inputs.model }}
+        GH_TOKEN: ${{ github.token }}
+      run: bash "${{ github.action_path }}/scripts/run-agent.sh"
+
+    - name: Post the result
+      if: always()
+      shell: bash
+      env:
+        WS: ${{ inputs.workspace }}
+        ISSUE: ${{ inputs.issue }}
+        WORKSPACE_DIR: ${{ inputs.workspace-dir }}
+        DEFAULT_BRANCH: ${{ inputs.default-branch }}
+        PUBLISH_TOKEN: ${{ inputs.publish-token }}
+      run: bash "${{ github.action_path }}/scripts/publish.sh"
