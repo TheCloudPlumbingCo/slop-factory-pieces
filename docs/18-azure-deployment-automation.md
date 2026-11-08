@@ -10,7 +10,7 @@ flowchart LR
   G[GitHub Actions] --> O[Entra OIDC]
   O --> B[Broker Terraform]
   O --> P[Portal Terraform]
-  B --> F[Functions, Cosmos, Service Bus, Key Vault]
+  B --> F[Container App, Cosmos, Key Vault]
   P --> C[Container Apps and Entra settings]
   B -. state .-> S1[dev/broker.tfstate]
   P -. state .-> S2[dev/portal.tfstate]
@@ -230,17 +230,17 @@ Infrastructure deployment creates resources. Application delivery supplies the r
 
 ### Include shared dependencies in delivery filters
 
-A core change must rebuild and deploy the broker. The broker imports `@slop/core` into its Function bundle.
+A core change must rebuild and deploy the broker. The broker imports `@slop/core` into its container bundle.
 The portal currently has no direct core dependency. Its image build uses the `portal` directory.
 
 Use these rules when adding application delivery jobs:
 
 | Changed paths | PR checks | Delivery after merge |
 | --- | --- | --- |
-| `packages/core/src/**`, `packages/core/package.json` | Core and broker tests; broker build | Broker Function ZIP |
+| `packages/core/src/**`, `packages/core/package.json` | Core and broker tests; broker build | Broker container image |
 | `packages/core/test/**` | Core tests | None |
-| `infra/azure/src/**`, `infra/azure/app/**`, `infra/azure/scripts/**`, `infra/azure/package.json`, `infra/azure/tsconfig.json` | Broker tests and build | Broker Function ZIP |
-| Root `package.json` or `bun.lock` | Core and broker tests; broker build | Broker Function ZIP |
+| `infra/azure/src/**`, `infra/azure/Dockerfile`, `infra/azure/scripts/**`, `infra/azure/package.json`, `infra/azure/tsconfig.json` | Broker tests and build | Broker container image |
+| Root `package.json` or `bun.lock` | Core and broker tests; broker build | Broker container image |
 | `portal/app/**`, `portal/components/**`, `portal/lib/**`, `portal/auth.ts` | Portal tests and build | Portal container image |
 | Portal dependency files, Dockerfile, or build configuration | Portal tests and build | Portal container image |
 | Terraform configuration | Component validation | Component infrastructure |
@@ -252,9 +252,10 @@ The infrastructure template currently filters Terraform files only. Application 
 
 ```mermaid
 flowchart LR
-  BT[Broker tests] --> BB[Build Function ZIP]
-  BB --> BI[Apply broker infrastructure]
-  BI --> BZ[Deploy Function ZIP]
+  BT[Broker tests] --> BB[Build Linux amd64 image]
+  BB --> BP[Push immutable GHCR image]
+  BP --> BI[Apply broker infrastructure with image]
+  BI --> BZ[Container App revision]
   PT[Portal tests] --> PB[Build Linux amd64 image]
   PB --> PP[Push immutable GHCR image]
   PP --> PI[Apply portal infrastructure with image]
@@ -266,11 +267,13 @@ Broker sequence:
 
 1. Install workspace dependencies from the repository root with `bun install --frozen-lockfile`.
 2. Run tests and type checks in `infra/azure`.
-3. Run `bun run bundle` there. It creates `dist/app.zip`.
-4. Apply broker Terraform with `package_path` unset when Azure CLI owns code deployment.
-5. Read `function_app_name` from Terraform output. Use the broker resource group from configuration.
-6. Sign in with `azure/login` through OIDC.
-7. Deploy the ZIP with `az functionapp deployment source config-zip`.
+3. Build `infra/azure/Dockerfile` for `linux/amd64` from the repository root.
+4. Push the image to GHCR with `packages: write` and the job's `GITHUB_TOKEN`.
+5. Pass the immutable image reference as `TF_VAR_image` during the broker plan.
+6. Apply that plan. Terraform updates the Container App revision.
+
+The broker is one Container App that scales to zero. It has no Function ZIP, no queue and no sweep.
+See `infra/azure/README.md`, "Known limits". `npm run deploy:broker` does these steps from a laptop.
 
 Portal sequence:
 

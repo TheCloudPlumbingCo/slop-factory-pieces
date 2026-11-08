@@ -1,6 +1,11 @@
 output "webhook_url" {
-  description = "Set this as the GitHub App's webhook URL. Assumes the Function app's route prefix is empty (host.json)."
-  value       = "https://${azurerm_linux_function_app.main.default_hostname}/integrations/github/webhook"
+  description = "Set this as the GitHub App's webhook URL."
+  value       = "https://${azurerm_container_app.main.ingress[0].fqdn}/integrations/github/webhook"
+}
+
+output "broker_public_origin" {
+  description = "The origin the runner calls back, and the OIDC audience."
+  value       = local.broker_public_origin
 }
 
 output "key_vault_name" {
@@ -8,14 +13,9 @@ output "key_vault_name" {
   value       = azurerm_key_vault.main.name
 }
 
-output "function_app_name" {
-  description = "The Function app; deploy the code to it."
-  value       = azurerm_linux_function_app.main.name
-}
-
-output "queue_name" {
-  description = "The Service Bus queue that carries the mailbox nudges."
-  value       = "${azurerm_servicebus_namespace.main.name}/${azurerm_servicebus_queue.nudges.name}"
+output "container_app_name" {
+  description = "The Container App that runs the broker."
+  value       = azurerm_container_app.main.name
 }
 
 output "cosmos_container" {

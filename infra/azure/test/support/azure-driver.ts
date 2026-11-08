@@ -43,7 +43,7 @@ import { Clock, ConfigProvider, Context, Effect, Exit, Layer, Redacted, Ref, Sco
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpEffect, HttpRouter, HttpServerRequest } from 'effect/http'
 import { TestClock } from 'effect/testing'
 
-import { makeStorage, sweep } from '../../src/MailboxStore'
+import { makeStorage } from '../../src/MailboxStore'
 import { type Handlers, makeHandlers } from '../../src/Handlers'
 import { MailboxTable } from '../../src/MailboxTable'
 import { Nudger } from '../../src/Nudger'
@@ -65,12 +65,8 @@ const MAX_SETTLE_TURNS = 10_000
 /** How processing is woken: by polling the table, or by nudges through a queue. */
 export type AzureDriverMode = 'polling' | 'nudge'
 
-/** The suite's driver plus the AWS-only levers the sweep tests need. */
+/** The suite's driver plus a lever to nudge a mailbox by hand. */
 export interface AwsControlLayerDriver extends ControlLayerDriver {
-	/** Run the sweep at the current time against the driver's table and nudger. Returns how many it nudged. */
-	readonly sweep: Effect.Effect<number>
-	/** Lose the next `count` nudges, as if the process died between saving and nudging. */
-	readonly dropNextNudges: (count: number) => Effect.Effect<void>
 	/** Send a nudge with no delay for `mailboxKey`, whatever the mailbox holds. */
 	readonly nudge: (mailboxKey: string) => Effect.Effect<void>
 }
@@ -228,20 +224,15 @@ export const makeAzureDriver = (input: {
 			}),
 		)
 
-		/** The queue, built once for the driver's life: like SQS, its messages survive `restart`. */
+		/** The fake queue stands in for the in-memory nudger's timers. It is built once; its messages survive `restart`. */
 		const queue = makeFakeQueue()
 		const queueNudger = Context.get(yield* Layer.build(queue.nudger), Nudger)
-		let nudgesToDrop = 0
 		const nudger = Layer.succeed(
 			Nudger,
 			Nudger.of({
 				nudge: (mailboxKey, delayMs) =>
 					Effect.suspend(() => {
 						if (input.mode === 'polling') return Effect.void
-						if (nudgesToDrop > 0) {
-							nudgesToDrop--
-							return Effect.void
-						}
 						return queueNudger.nudge(mailboxKey, delayMs)
 					}),
 			}),
@@ -461,15 +452,6 @@ export const makeAzureDriver = (input: {
 				yield* Scope.close((yield* Ref.get(processing)).scope, Exit.void)
 				yield* Ref.set(processing, yield* startProcessing)
 			}),
-			sweep: Clock.currentTimeMillis.pipe(
-				Effect.flatMap(sweep),
-				Effect.provide(tableAndNudger),
-				Effect.orDie,
-			),
-			dropNextNudges: (count) =>
-				Effect.sync(() => {
-					nudgesToDrop = count
-				}),
 			nudge: (mailboxKey) => queueNudger.nudge(mailboxKey, 0),
 		} satisfies AwsControlLayerDriver
 	})

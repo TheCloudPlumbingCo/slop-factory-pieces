@@ -1,0 +1,17 @@
+# BuildKit reads this file for infra/azure/Dockerfile. The build context is the repository root.
+**/node_modules
+**/dist
+**/.terraform
+**/*.tfstate
+**/*.tfstate.backup
+**/terraform.tfvars
+**/.env*
+.git
+.claude
+.local-artifacts
+portal
+portal-poc
+docs
+examples
+agents
+channels

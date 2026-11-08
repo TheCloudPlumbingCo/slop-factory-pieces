@@ -85,6 +85,7 @@ describe('researchAgentSessions', () => {
 					task: 'why does CI fail?',
 					issueNumber: 42,
 					deliveryId: 'delivery:v1:abc:def',
+					runId: 'delivery:v1:abc:def',
 					brokerOrigin: 'https://broker.example',
 				},
 			})

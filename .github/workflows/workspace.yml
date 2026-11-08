@@ -100,3 +100,5 @@ jobs:
           # Sent by the broker. A manual dispatch has neither, and then no report is sent.
           broker-origin: ${{ github.event.client_payload.brokerOrigin }}
           delivery-id: ${{ github.event.client_payload.deliveryId }}
+          # A repeated hand-off carries the same id, so the Action skips the second run.
+          run-id: ${{ github.event.client_payload.runId }}

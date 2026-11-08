@@ -16,13 +16,13 @@ variable "stage" {
   default     = "dev"
 }
 
-variable "package_path" {
+variable "image" {
   description = <<-EOT
-    Path to the zip of the Function app (built by `bun run bundle` in infra/azure, once that exists). Leave null to
-    create only the infrastructure and deploy the code separately.
+    The broker's container image, such as ghcr.io/<owner>/slop-broker:<tag>. `npm run deploy:broker` builds and pushes
+    it and passes it here. The image must be public, because the Container App pulls it with no credentials.
   EOT
   type        = string
-  default     = null
+  default     = "ghcr.io/changeme/slop-broker:latest"
 }
 
 variable "log_retention_days" {
@@ -37,10 +37,10 @@ variable "log_daily_cap_gb" {
   default     = 1
 }
 
-variable "max_scale_out" {
-  description = "Most instances the Function app scales out to. Azure has no API Gateway throttle, so this caps what anyone can make the Receiver and the store do."
+variable "max_replicas" {
+  description = "Most replicas the Container App scales out to. The claim and lease in Cosmos keep two replicas from doing the same work. A cost guard."
   type        = number
-  default     = 5
+  default     = 2
 }
 
 variable "monthly_budget_usd" {
@@ -61,11 +61,10 @@ variable "budget_start_date" {
   default     = "2026-11-01T00:00:00Z"
 }
 
-variable "oidc_audience" {
+variable "broker_public_origin" {
   description = <<-EOT
-    The audience the research workflow requests for its GitHub OIDC token: the broker's public origin, such as
-    https://func-xyz.azurewebsites.net. It cannot be computed from the Function app's hostname without a Terraform
-    cycle. Leave null to let the code use https://$WEBSITE_HOSTNAME, which matches what the workflow sends.
+    The broker's public origin, such as https://broker.example.com. The workflow asks GitHub for an identity token for
+    it. Leave null to use the Container App's default address.
   EOT
   type        = string
   default     = null
@@ -74,5 +73,5 @@ variable "oidc_audience" {
 variable "oidc_allowed_workflow_ref" {
   description = "Comma separated job_workflow_ref values (exact match) whose OIDC tokens may drive a research task."
   type        = string
-  default     = "yashodhah/slop-research-spike/.github/workflows/research-broker.yml@refs/heads/main"
+  default     = "TheCloudPlumbingCo/slop-factory-pieces/.github/workflows/workspace.yml@refs/heads/main"
 }

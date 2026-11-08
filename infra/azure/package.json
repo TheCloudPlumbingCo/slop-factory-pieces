@@ -4,14 +4,13 @@
 	"type": "module",
 	"scripts": {
 		"test": "vitest --run",
-		"bundle": "bun scripts/bundle.ts",
-		"typecheck": "tsc --noEmit -p tsconfig.json"
+		"bundle": "esbuild src/main.ts --bundle --platform=node --target=node22 --format=cjs --minify --sourcemap=linked --outfile=dist/server.js",
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"start": "node dist/server.js"
 	},
 	"dependencies": {
 		"@azure/cosmos": "4.10.1",
-		"@azure/functions": "4.17.0",
 		"@azure/identity": "4.14.0",
-		"@azure/service-bus": "7.10.0",
 		"@effect/platform-node": "4.0.0",
 		"@humanlayer/channels-delivery": "0.1.0",
 		"@humanlayer/channels-github": "0.1.0",

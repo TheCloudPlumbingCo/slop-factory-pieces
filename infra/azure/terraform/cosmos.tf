@@ -1,6 +1,6 @@
 # Layout is the same as the DynamoDB table (see infra/aws/src/DynamoMailboxTable.ts): partition key `pk`, one item
 # per mailbox, dedup items carrying a `ttl` (seconds). Cosmos indexes every property, so the `due` / `dueAt` pair
-# the sweep queries needs no secondary index.
+# is stored too (the Cosmos table keeps it, though nothing sweeps on it now).
 resource "azurerm_cosmosdb_account" "main" {
   name                = "cosmos-${local.compact}"
   location            = azurerm_resource_group.main.location
@@ -8,7 +8,7 @@ resource "azurerm_cosmosdb_account" "main" {
   offer_type          = "Standard"
   kind                = "GlobalDocumentDB"
 
-  # Pay per request, like DynamoDB on-demand. Keys are off: the Function app signs in with its identity.
+  # Pay per request, like DynamoDB on-demand. Keys are off: the Container App signs in with its identity.
   local_authentication_enabled = false
 
   capabilities {
@@ -48,6 +48,6 @@ resource "azurerm_cosmosdb_sql_role_assignment" "app" {
   resource_group_name = azurerm_resource_group.main.name
   account_name        = azurerm_cosmosdb_account.main.name
   role_definition_id  = "${azurerm_cosmosdb_account.main.id}/sqlRoleDefinitions/00000000-0000-0000-0000-000000000002"
-  principal_id        = azurerm_linux_function_app.main.identity[0].principal_id
+  principal_id        = azurerm_user_assigned_identity.app.principal_id
   scope               = azurerm_cosmosdb_account.main.id
 }
