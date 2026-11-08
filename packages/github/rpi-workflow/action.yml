@@ -115,6 +115,17 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: bash "${{ github.action_path }}/scripts/run-agent.sh"
 
+    # A short summary with diagrams, for the issue comment and the PR description. It runs only when the research
+    # worked, and it never fails the job: without it, the next step posts a short fallback.
+    - name: Write the short summary
+      if: steps.repeat.outputs.skip != 'true'
+      shell: bash
+      continue-on-error: true
+      env:
+        COPILOT_GITHUB_TOKEN: ${{ inputs.copilot-token }}
+        MODEL: ${{ inputs.model }}
+      run: bash "${{ github.action_path }}/scripts/summarize.sh"
+
     - name: Post the result
       if: always() && steps.repeat.outputs.skip != 'true'
       shell: bash
