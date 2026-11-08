@@ -168,6 +168,7 @@ describe('publish.sh', () => {
 		expect(calls).toContain('pr create --base main --head be/research/issue-42')
 		expect(calls).toContain('issue comment 42 --repo acme/ws --body-file')
 		expect(readFileSync(join(s.tmp, 'result.md'), 'utf8')).toContain('Research PR: https://github.com/acme/ws/pull/7')
+		expect(readFileSync(join(s.tmp, 'pr-url'), 'utf8')).toBe('https://github.com/acme/ws/pull/7')
 	})
 
 	it('on failure opens no PR and comments the failure', () => {
@@ -322,5 +323,100 @@ describe('build-prompt.sh', () => {
 		const text = prompt({ INSTRUCTIONS: '' }, issue)
 		expect(text).toContain("the 'be' workspace")
 		expect(text).toContain('Do not modify any file.')
+	})
+})
+
+describe('report.sh', () => {
+	/** A temp folder with a fake `curl` that logs every call. A call that asks for a token gets one. */
+	const setup = (status: 'ok' | 'fail', http = '204') => {
+		const tmp = join(root, 'tmp')
+		mkdirSync(tmp)
+		writeFileSync(join(tmp, 'status'), `${status}\n`)
+		const bin = join(root, 'bin')
+		mkdirSync(bin)
+		const log = join(root, 'curl.log')
+		writeFileSync(
+			join(bin, 'curl'),
+			`#!/usr/bin/env bash
+echo "CALL $*" >> "${log}"
+for a in "$@"; do case "$a" in @*) cat "\${a#@}" >> "${log}"; echo >> "${log}";; esac; done
+case "$*" in *audience=*) echo '{"value":"jwt-123"}';; *) printf '${http}';; esac
+`,
+		)
+		chmodSync(join(bin, 'curl'), 0o755)
+		return { tmp, bin, log }
+	}
+
+	const report = (s: ReturnType<typeof setup>, env: Record<string, string> = {}) =>
+		run('report.sh', [], {
+			cwd: root,
+			env: {
+				PATH: `${s.bin}:${process.env.PATH ?? ''}`,
+				BROKER_ORIGIN: 'https://broker.example.net',
+				DELIVERY_ID: 'd-1',
+				WS: 'be',
+				ISSUE: '42',
+				RUNNER_TEMP: s.tmp,
+				ACTIONS_ID_TOKEN_REQUEST_URL: 'https://token.example/req?x=1',
+				ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'req-token',
+				GITHUB_REPOSITORY: 'acme/ws',
+				GITHUB_SERVER_URL: 'https://github.com',
+				GITHUB_RUN_ID: '99',
+				...env,
+			},
+		})
+
+	it('on success posts complete with the links', () => {
+		const s = setup('ok')
+		writeFileSync(join(s.tmp, 'comment-url'), 'https://github.com/acme/ws/issues/42#issuecomment-1')
+		writeFileSync(join(s.tmp, 'pr-url'), 'https://github.com/acme/ws/pull/7')
+		const r = report(s)
+		expect(r.status, r.stderr).toBe(0)
+		const calls = readFileSync(s.log, 'utf8')
+		expect(calls).toContain('audience=https://broker.example.net')
+		expect(calls).toContain('https://broker.example.net/research-session/d-1/complete')
+		expect(calls).toContain('Authorization: Bearer jwt-123')
+		expect(calls).toContain('issuecomment-1')
+		expect(calls).toContain('pull/7')
+		expect(r.stdout).toContain('Reported')
+	})
+
+	it('on failure posts fail with the run link', () => {
+		const s = setup('fail')
+		const r = report(s)
+		expect(r.status).toBe(0)
+		const calls = readFileSync(s.log, 'utf8')
+		expect(calls).toContain('/research-session/d-1/fail')
+		expect(calls).toContain('actions/runs/99')
+	})
+
+	it('sends nothing without a delivery (a manual dispatch)', () => {
+		const s = setup('ok')
+		const r = report(s, { BROKER_ORIGIN: '', DELIVERY_ID: '' })
+		expect(r.status).toBe(0)
+		expect(existsSync(s.log)).toBe(false)
+	})
+
+	it('sends nothing to an origin that is not https', () => {
+		const s = setup('ok')
+		const r = report(s, { BROKER_ORIGIN: 'http://broker.example.net' })
+		expect(r.status).toBe(0)
+		expect(existsSync(s.log)).toBe(false)
+		expect(r.stdout).toContain('not https')
+	})
+
+	it('warns, and does not fail the job, without an identity token', () => {
+		const s = setup('ok')
+		const r = report(s, { ACTIONS_ID_TOKEN_REQUEST_URL: '', ACTIONS_ID_TOKEN_REQUEST_TOKEN: '' })
+		expect(r.status).toBe(0)
+		expect(r.stdout).toContain('id-token: write')
+		expect(existsSync(s.log)).toBe(false)
+	})
+
+	it('warns, and does not fail the job, when the broker refuses', () => {
+		const s = setup('ok', '401')
+		const r = report(s)
+		expect(r.status).toBe(0)
+		expect(r.stdout).toContain('HTTP 401')
 	})
 })

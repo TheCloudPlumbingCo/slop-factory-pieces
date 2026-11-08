@@ -36,7 +36,7 @@ if [ "$status" = ok ] && [ -s "$tmp/out.md" ]; then
       || url=$(cd "$dir" && GH_TOKEN="$PUBLISH_TOKEN" gh pr create --base "$base" --head "$branch" --title "$title" --body "$body" 2>/dev/null) \
       || url=$(cd "$dir" && GH_TOKEN="$PUBLISH_TOKEN" gh pr view "$branch" --json url --jq .url 2>/dev/null) \
       || url=""
-    if [ -n "$url" ]; then printf '\n\n---\nResearch PR: %s\n' "$url" >> "$result"
+    if [ -n "$url" ]; then printf '%s' "$url" > "$tmp/pr-url"; printf '\n\n---\nResearch PR: %s\n' "$url" >> "$result"
     else printf '\n\n---\nThe research pull request could not be opened. See the run: %s\n' "$run_url" >> "$result"; fi
   else
     printf '\n\n---\nThe research branch could not be pushed. See the run: %s\n' "$run_url" >> "$result"
@@ -47,4 +47,4 @@ fi
 if [ "$(wc -c < "$result")" -gt 60000 ]; then
   head -c 60000 "$result" > "$result.cut"; printf '\n\n(The result was cut. See the run: %s)\n' "$run_url" >> "$result.cut"; mv "$result.cut" "$result"
 fi
-GH_TOKEN="$PUBLISH_TOKEN" gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body-file "$result"
+GH_TOKEN="$PUBLISH_TOKEN" gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body-file "$result" | tail -n 1 > "$tmp/comment-url"

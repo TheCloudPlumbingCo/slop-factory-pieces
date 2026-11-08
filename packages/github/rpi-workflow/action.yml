@@ -38,6 +38,12 @@ inputs:
   board-token:
     description: Token with organisation Projects write. Optional. Without it the card does not move.
     default: ''
+  broker-origin:
+    description: The broker's https origin from the dispatch payload. Optional. With delivery-id it sends the final report.
+    default: ''
+  delivery-id:
+    description: The broker's delivery id from the dispatch payload. Optional.
+    default: ''
 
 runs:
   using: composite
@@ -101,3 +107,14 @@ runs:
         DEFAULT_BRANCH: ${{ inputs.default-branch }}
         PUBLISH_TOKEN: ${{ inputs.publish-token }}
       run: bash "${{ github.action_path }}/scripts/publish.sh"
+
+    # The workflow does not know the channel. It tells the broker the run ended; the broker replies.
+    - name: Report to the broker
+      if: always()
+      shell: bash
+      env:
+        BROKER_ORIGIN: ${{ inputs.broker-origin }}
+        DELIVERY_ID: ${{ inputs.delivery-id }}
+        WS: ${{ inputs.workspace }}
+        ISSUE: ${{ inputs.issue }}
+      run: bash "${{ github.action_path }}/scripts/report.sh"
