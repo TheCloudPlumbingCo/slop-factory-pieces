@@ -5,6 +5,9 @@ description: >
   .github/workflows/workspace.yml. It needs the workspace repo checked out first.
 
 inputs:
+  command:
+    description: The command to run. Today only research.
+    default: research
   workspace:
     description: Workspace id, a folder under workspaces/.
     required: true
@@ -20,9 +23,6 @@ inputs:
   default-branch:
     description: The workspace repo's default branch. The research pull request targets it.
     default: main
-  card-status:
-    description: Board column to move the card to when the run starts. The board number comes from workspace.json.
-    default: Research
   model:
     description: Copilot model id for the agent. Empty uses the CLI default.
     default: ''
@@ -42,6 +42,13 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Resolve the command
+      id: command
+      shell: bash
+      env:
+        COMMAND: ${{ inputs.command }}
+      run: bash "${{ github.action_path }}/scripts/resolve-command.sh"
+
     - name: Check the workspace
       shell: bash
       env:
@@ -60,7 +67,7 @@ runs:
       run: |
         project=$(jq -r '.project // empty' "$WORKSPACE_DIR/workspaces/$WS/workspace.json")
         if [ -n "$project" ]; then
-          bash "${{ github.action_path }}/scripts/move-card.sh" "${{ inputs.issue }}" "${{ inputs.card-status }}" "$project"
+          bash "${{ github.action_path }}/scripts/move-card.sh" "${{ inputs.issue }}" "${{ steps.command.outputs.card-status }}" "$project"
         else
           echo "workspace.json has no project number; the card does not move."
         fi
