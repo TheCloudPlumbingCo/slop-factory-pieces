@@ -69,7 +69,7 @@ flowchart TD
 | 1 | `scripts/check-workspace.sh` | Fails with a short message when the workspace id or folder is wrong. |
 | 2 | `scripts/move-card.sh` | Optional. Never moves a card backwards. Needs the board token. |
 | 3 | `scripts/clone-repos.sh` | Removes `.git`, so the agent cannot push. |
-| 4 | `scripts/run-agent.sh` | The only file that names the agent. Today: the Copilot CLI. |
+| 4 | `scripts/run-agent.sh` | The only file that names the agent. Today: the Copilot CLI. `scripts/build-prompt.sh` builds the prompt. |
 | 5 | `scripts/publish.sh` | Runs even when an earlier stage failed. Posts the result or the failure as a comment. |
 
 `scripts/guard-output.sh` withholds agent output that looks like an access token.
@@ -82,8 +82,8 @@ The workflow reads these fields from `github.event.client_payload`:
 | --- | --- |
 | `command` | What to run. Today only `research`. Missing means `research`. An unknown command gets a comment on the issue. |
 | `workspace` | Workspace id. |
-| `issueNumber` | The workspace issue that gets the result. |
-| `task` | The research task. When empty, the issue title and body are used. |
+| `issueNumber` | The workspace issue. Its title and body are always the base input. It also gets the result. |
+| `task` | Optional extra instructions: the text after the command. They are added to the issue title and body, never instead of them. |
 
 The broker also sends `deliveryId` and `brokerOrigin`. This version ignores both.
 
@@ -108,3 +108,22 @@ The broker also sends `deliveryId` and `brokerOrigin`. This version ignores both
 ```
 
 The tests run the scripts in temp folders. They use local git repos and a fake `gh`. They do not call GitHub.
+
+## The prompt
+
+`scripts/build-prompt.sh` builds it. The input is the issue plus the optional instructions:
+
+```text
+You are doing read-only research for the '<workspace>' workspace. Its repositories are cloned under ./repos/ ...
+Reply with markdown only: a one-line answer first, then the evidence ... 'Affected repos' ... 'Open questions'.
+
+## Issue #<number>
+Title: <issue title>
+
+<issue body>
+
+## Additional instructions      <- only when the comment has text after the command
+<instructions>
+```
+
+If the issue cannot be read, the prompt says so and still carries the instructions.

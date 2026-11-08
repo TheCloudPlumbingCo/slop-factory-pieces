@@ -88,7 +88,8 @@ jobs:
           command: ${{ github.event.client_payload.command || 'research' }}
           workspace: ${{ github.event.client_payload.workspace }}
           issue: ${{ github.event.client_payload.issueNumber }}
-          task: ${{ github.event.client_payload.task }}
+          # The broker calls the text after the command "task". It is extra instructions; the issue is always the base input.
+          instructions: ${{ github.event.client_payload.task }}
           default-branch: ${{ github.event.repository.default_branch }}
           model: ${{ inputs.model }}
           copilot-token: ${{ secrets.COPILOT_GITHUB_TOKEN }}

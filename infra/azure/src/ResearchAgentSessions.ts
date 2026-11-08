@@ -76,7 +76,7 @@ export const researchAgentSessions = (options: ResearchSessionsOptions): Layer.L
 							const args = readResearchArgs(task)
 							if (args._tag === 'MissingWorkspace') {
 								return yield* failDelivery(
-									'Name the workspace after /research, for example `/research --ws be how does the tea service call water?`. The workspace is a folder under `workspaces/`.',
+									'Name the workspace after /research, for example `/research --ws be`. Text after it is optional extra instructions; the issue is the base input. The workspace is a folder under `workspaces/`.',
 								)
 							}
 							if (args._tag === 'InvalidWorkspace') {
