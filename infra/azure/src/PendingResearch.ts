@@ -45,7 +45,7 @@ export const makeMemoryPendingResearch = (): PendingResearchStore => {
  */
 export const PENDING_PARTITION = 'pending-research'
 
-const itemId = (deliveryId: string) => `research#${deliveryId}`
+const itemId = (deliveryId: string) => `research:${deliveryId}`
 
 /** Pending records in the mailbox container, each with its own `ttl` (the container's default ttl is -1). */
 export const makeCosmosPendingResearch = (items: CosmosItems): PendingResearchStore => ({

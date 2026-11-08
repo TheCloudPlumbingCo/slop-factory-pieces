@@ -234,7 +234,13 @@ describe('cosmos pending store', () => {
 	it('writes the item with a ttl in a fixed partition', async () => {
 		const cosmos = makeFakeCosmos()
 		await makeCosmosPendingResearch(cosmos).save({ ...pendingRecord, expiresAt: NOW })
-		expect(cosmos.items('pending-research').get(`research#${DELIVERY}`)).toMatchObject({ ttl: 900, repositoryId: '8' })
+		expect(cosmos.items('pending-research').get(`research:${DELIVERY}`)).toMatchObject({ ttl: 900, repositoryId: '8' })
+	})
+
+	it('uses an item id Cosmos accepts: no slash, backslash, question mark or hash', async () => {
+		const cosmos = makeFakeCosmos()
+		await makeCosmosPendingResearch(cosmos).save({ ...pendingRecord, expiresAt: NOW })
+		for (const id of cosmos.items('pending-research').keys()) expect(id).not.toMatch(/[/\\?#]/)
 	})
 
 	it('lets only one of two racing takes win', async () => {
