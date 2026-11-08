@@ -1,4 +1,4 @@
-import { AgentSessionMessage, AgentSessions, DeliveryApi, readResearchArgs, targetOf } from '@slop/core'
+import { AgentSessionMessage, AgentSessions, CardMover, DeliveryApi, nextColumn, readResearchArgs, targetOf } from '@slop/core'
 import { Context, Effect, Layer, Redacted, Schema } from 'effect'
 
 import type { RepositoryDispatch } from './GithubDispatch'
@@ -36,6 +36,11 @@ export interface ResearchSessionsOptions {
 	readonly pending: PendingResearchStore
 	/** Who gets every prompt that is not a research command. */
 	readonly fallback: Layer.Layer<AgentSessions, never, DeliveryApi>
+	/**
+	 * The project board. After GitHub accepts a dispatch for a workspace, the card moves to the column the state table
+	 * names for `research` and `HandedOff`. The move runs in the background and never fails the delivery. Default: no board.
+	 */
+	readonly cardMover?: Layer.Layer<CardMover>
 }
 
 /**
@@ -54,6 +59,8 @@ export const researchAgentSessions = (options: ResearchSessionsOptions): Layer.L
 				yield* Layer.build(options.fallback.pipe(Layer.provide(Layer.succeed(DeliveryApi, api)))),
 				AgentSessions,
 			)
+			const cardMover =
+				options.cardMover === undefined ? undefined : Context.get(yield* Layer.build(options.cardMover), CardMover)
 			return AgentSessions.of({
 				getByName: (mailboxKey) => ({
 					send: Effect.fn('research_agent.send')(function* (input: typeof AgentSessionMessage.Encoded) {
@@ -107,7 +114,7 @@ export const researchAgentSessions = (options: ResearchSessionsOptions): Layer.L
 							),
 						)
 						if (!saved) return
-						yield* Effect.tryPromise(() =>
+						const dispatched = yield* Effect.tryPromise(() =>
 							options.dispatch({
 								installationId: Number(ref.installationId),
 								owner: ref.owner,
@@ -124,13 +131,31 @@ export const researchAgentSessions = (options: ResearchSessionsOptions): Layer.L
 								},
 							}),
 						).pipe(
+							Effect.as(true),
 							Effect.catch((error) =>
 								Effect.logError('research_agent: dispatch failed', error).pipe(
 									Effect.andThen(Effect.promise(() => options.pending.take(message.deliveryId).catch(() => false))),
 									Effect.andThen(failDelivery(`Could not start the research workflow in this repository: ${describe(error)}`)),
+									Effect.as(false),
 								),
 							),
 						)
+						// The workflow is started. Put the card in the column the state table names. This runs in the
+						// background: the webhook answer does not wait for it, and a problem is only logged.
+						const column = nextColumn('research', 'HandedOff')
+						if (dispatched && workspace !== undefined && cardMover !== undefined && column !== undefined) {
+							const board = { installationId: Number(ref.installationId), owner: ref.owner, repository: ref.repository }
+							yield* cardMover.projectNumber({ ...board, workspace }).pipe(
+								Effect.flatMap((projectNumber) =>
+									projectNumber === undefined
+										? Effect.void
+										: cardMover.moveCard({ ...board, issueNumber: Number(ref.number), projectNumber, column }),
+								),
+								Effect.catch((error) => Effect.logError('research_agent: card move failed', error)),
+								Effect.catchDefect((defect) => Effect.logError('research_agent: card move failed', defect)),
+								Effect.forkDetach,
+							)
+						}
 					}),
 				}),
 			})

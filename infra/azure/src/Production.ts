@@ -7,6 +7,7 @@ import { envConfigProvider } from './Config'
 import { fromCosmosContainer } from './CosmosContainer'
 import { CosmosMailboxTableLive } from './CosmosMailboxTable'
 import { dispatchRepositoryEvent } from './GithubDispatch'
+import { GithubCardMoverLive } from './GithubProjects'
 import { makeHandlers } from './Handlers'
 import { makeInMemoryNudger } from './InMemoryNudger'
 import { makeInProcessAgentSessions } from './InProcessAgent'
@@ -51,6 +52,8 @@ export const productionHandlers = Effect.gen(function* () {
 				brokerOrigin,
 				pending,
 				fallback: echo.layer,
+				// The broker owns the card states. The workflow never moves a card.
+				cardMover: GithubCardMoverLive({ appId, privateKey: Redacted.value(privateKey) }),
 			}),
 			drain: echo.drain,
 		},

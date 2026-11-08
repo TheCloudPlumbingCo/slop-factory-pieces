@@ -29,12 +29,50 @@ export const appJwt = (credentials: AppCredentials, nowMs: number): string => {
 	return `${header}.${payload}.${base64url(signature)}`
 }
 
-const githubHeaders = (token: string) => ({
+export const githubHeaders = (token: string) => ({
 	accept: 'application/vnd.github+json',
 	authorization: `Bearer ${token}`,
 	'x-github-api-version': '2022-11-28',
 	'user-agent': 'slop-code-factory-azure',
 })
+
+/** What GitHub answers to an installation token request: the token and the permissions it holds. */
+export interface InstallationToken {
+	readonly token: string
+	readonly permissions?: Readonly<Record<string, string>>
+}
+
+/**
+ * Get an installation token for the App. Without `permissions` the token has every permission the App holds on the
+ * installation, as the dispatch has always used. With `permissions` the token is narrowed to those, such as
+ * `{ organization_projects: 'write' }`; GitHub answers 422 when the App does not hold one of them.
+ *
+ * @param fetchImpl - the HTTP function; tests pass a fake
+ */
+export const installationToken = async (
+	credentials: AppCredentials,
+	installationId: number,
+	options: {
+		readonly permissions?: Readonly<Record<string, string>>
+		readonly fetchImpl?: typeof fetch
+		readonly nowMs?: number
+	} = {},
+): Promise<InstallationToken> => {
+	const fetchImpl = options.fetchImpl ?? fetch
+	const origin = credentials.apiOrigin ?? 'https://api.github.com'
+	const narrowed = options.permissions !== undefined
+	const tokenResponse = await fetchImpl(`${origin}/app/installations/${installationId}/access_tokens`, {
+		method: 'POST',
+		headers: narrowed
+			? { ...githubHeaders(appJwt(credentials, options.nowMs ?? Date.now())), 'content-type': 'application/json' }
+			: githubHeaders(appJwt(credentials, options.nowMs ?? Date.now())),
+		...(narrowed ? { body: JSON.stringify({ permissions: options.permissions }) } : {}),
+	})
+	if (!tokenResponse.ok) {
+		throw new Error(`GitHub installation token request failed: ${tokenResponse.status} ${await tokenResponse.text()}`)
+	}
+	return (await tokenResponse.json()) as InstallationToken
+}
 
 /**
  * Send a `repository_dispatch` event: get an installation token for the App, then POST to the repository's
@@ -49,17 +87,7 @@ export const dispatchRepositoryEvent = async (
 	nowMs: number = Date.now(),
 ): Promise<void> => {
 	const origin = credentials.apiOrigin ?? 'https://api.github.com'
-	const tokenResponse = await fetchImpl(`${origin}/app/installations/${dispatch.installationId}/access_tokens`, {
-		method: 'POST',
-		headers: githubHeaders(appJwt(credentials, nowMs)),
-	})
-	if (!tokenResponse.ok) {
-		throw new Error(`GitHub installation token request failed: ${tokenResponse.status} ${await tokenResponse.text()}`)
-	}
-	const { token, permissions } = (await tokenResponse.json()) as {
-		token: string
-		permissions?: Readonly<Record<string, string>>
-	}
+	const { token, permissions } = await installationToken(credentials, dispatch.installationId, { fetchImpl, nowMs })
 	const response = await fetchImpl(`${origin}/repos/${dispatch.owner}/${dispatch.repository}/dispatches`, {
 		method: 'POST',
 		headers: { ...githubHeaders(token), 'content-type': 'application/json' },

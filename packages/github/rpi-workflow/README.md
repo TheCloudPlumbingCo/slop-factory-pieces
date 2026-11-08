@@ -39,7 +39,7 @@ The organization also needs:
 | `APP_ID` | repository or organization variable | The slop factory GitHub App ID. |
 | `APP_PRIVATE_KEY` | secret | The App private key. The workflow mints short-lived tokens from it. |
 | `COPILOT_GITHUB_TOKEN` | secret | The Copilot CLI signs in with it. |
-| `workspaces/<id>/workspace.json` | workspace repo | Lists the repos and the project number. |
+| `workspaces/<id>/workspace.json` | workspace repo | Lists the repos and the project number. The broker reads the project number to move the card. |
 
 Example `workspace.json`:
 
@@ -58,8 +58,7 @@ flowchart TD
     D["repository_dispatch<br/>workspace, issueNumber, task"] --> W["Reusable workflow<br/>runner, timeout, tokens"]
     W --> A["Action: stages"]
     A --> S1["1. Check the workspace"]
-    S1 --> S2["2. Move the board card to Research"]
-    S2 --> S3["3. Download the repos, read-only"]
+    S1 --> S3["3. Download the repos, read-only"]
     S3 --> S4["4. Run the agent"]
     S4 --> S4b["4b. Write a short summary"]
     S4b --> S5["5. Open a research PR and post a short comment"]
@@ -68,9 +67,9 @@ flowchart TD
 
 | Stage | Script | Notes |
 | --- | --- | --- |
-| 0 | `scripts/resolve-command.sh` | Maps the command to a board column. Rejects an unknown command. This is where a new phase is added. |
+| 0 | `scripts/resolve-command.sh` | Checks the command. Rejects an unknown or unsupported command. This is where a new phase is added. |
 | 1 | `scripts/check-workspace.sh` | Fails with a short message when the workspace id or folder is wrong. |
-| 2 | `scripts/move-card.sh` | Optional. Never moves a card backwards. Needs the board token. |
+| 2 | none | The broker moves the board card. The workflow never names a column. See "The board card". |
 | 3 | `scripts/clone-repos.sh` | Removes `.git`, so the agent cannot push. |
 | 4 | `scripts/run-agent.sh` | Decides what to ask. `scripts/agent.sh` is the only file that names the agent. Today: the Copilot CLI. `scripts/build-prompt.sh` builds the prompt. |
 | 4b | `scripts/summarize.sh` | Runs only when the research worked. Asks the agent for a short summary with diagrams. Never fails the job. |
@@ -78,6 +77,17 @@ flowchart TD
 | 6 | `scripts/report.sh` | Runs even when an earlier stage failed. Sends `complete` or `fail` to the broker with an identity token. Sends nothing when the payload has no `deliveryId` (a manual dispatch). Never fails the job. |
 
 `scripts/guard-output.sh` withholds agent output that looks like an access token. It runs on the research and on the summary.
+
+## The board card
+
+The broker moves the card. The workflow does not, and it has no board token.
+
+- The broker keeps a small table: command and event give the next column. The code is `packages/core/src/CardStates.ts`.
+- Events are `HandedOff`, `Succeeded`, and `Failed`. Today only one rule exists: `research` and `HandedOff` give `Research`.
+- The broker applies the rule right after GitHub accepts the dispatch. It reads the project number from `workspaces/<id>/workspace.json`. The move runs in the background. A problem is logged and never fails the delivery.
+- A research success or failure does not move the card. A person merges the research PR, and the workspace repo's `board-sync.yml` then moves the card to Design.
+- A card never moves to the left. A card that is not on the board is added first.
+- The workflow only reports `complete` or `fail`. To change a column rule, change the table in the broker.
 
 ## What the comment shows
 
