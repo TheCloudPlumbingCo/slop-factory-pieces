@@ -19,6 +19,7 @@ on:
 permissions:
   contents: write
   issues: read
+  id-token: write   # the last step proves its identity to the broker
 jobs:
   run:
     uses: TheCloudPlumbingCo/slop-factory-pieces/.github/workflows/workspace.yml@main
@@ -61,6 +62,7 @@ flowchart TD
     S2 --> S3["3. Download the repos, read-only"]
     S3 --> S4["4. Run the agent"]
     S4 --> S5["5. Open a research PR and comment on the issue"]
+    S5 --> S6["6. Report to the broker"]
 ```
 
 | Stage | Script | Notes |
@@ -71,6 +73,7 @@ flowchart TD
 | 3 | `scripts/clone-repos.sh` | Removes `.git`, so the agent cannot push. |
 | 4 | `scripts/run-agent.sh` | The only file that names the agent. Today: the Copilot CLI. `scripts/build-prompt.sh` builds the prompt. |
 | 5 | `scripts/publish.sh` | Runs even when an earlier stage failed. Posts the result or the failure as a comment. |
+| 6 | `scripts/report.sh` | Runs even when an earlier stage failed. Sends `complete` or `fail` to the broker with an identity token. Sends nothing when the payload has no `deliveryId` (a manual dispatch). Never fails the job. |
 
 `scripts/guard-output.sh` withholds agent output that looks like an access token.
 
@@ -85,14 +88,15 @@ The workflow reads these fields from `github.event.client_payload`:
 | `issueNumber` | The workspace issue. Its title and body are always the base input. It also gets the result. |
 | `task` | Optional extra instructions: the text after the command. They are added to the issue title and body, never instead of them. |
 
-The broker also sends `deliveryId` and `brokerOrigin`. This version ignores both.
+| `deliveryId`, `brokerOrigin` | Sent by the broker. Stage 6 uses them to report the end of the run. The broker then replies on the channel the comment came from. The workflow does not know the channel. |
 
 ## Limits to know
 
 - A reusable workflow cannot get more permission than its caller. The `permissions` block stays in the caller's file.
 - A reusable workflow cannot use `uses: ./...` for an Action. The path would point into the caller's repo. The workflow uses the full path with `@main`.
 - `repository_dispatch` runs only from the default branch.
-- The broker still waits for a result on its delivery. This version does not call the broker, so the broker side can show a timeout in the discussion. The result is on the workspace issue.
+- The report needs two settings outside this repo. The caller file grants `id-token: write`. The broker setting `OIDC_ALLOWED_WORKFLOW_REF` holds `TheCloudPlumbingCo/slop-factory-pieces/.github/workflows/workspace.yml@refs/heads/main`. Without them the broker refuses the report and the delivery times out. The result is still on the workspace issue.
+- A run that dies or is cancelled sends no report. The broker needs a watchdog for that case.
 
 ## Next
 
