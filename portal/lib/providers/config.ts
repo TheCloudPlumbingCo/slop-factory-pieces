@@ -14,7 +14,7 @@ export function clientCreds(p: Provider): ClientCreds | null {
   return id && secret ? { clientId: id, clientSecret: secret } : null;
 }
 
-// Real connections need: not the no-auth preview, provider credentials, and the encryption key.
+// Real connections need provider credentials and the encryption key.
 let warnedBadMode = false;
 export function isLive(p: Provider): boolean {
   if (p === "github" && githubMode() === null) {
@@ -22,7 +22,7 @@ export function isLive(p: Provider): boolean {
     warnedBadMode = true;
     return false;
   }
-  return !process.env.PROTOTYPE_NO_AUTH && clientCreds(p) !== null && hasEncryptionKey();
+  return clientCreds(p) !== null && hasEncryptionKey();
 }
 
 export const liveProviders = (): Record<Provider, boolean> => ({ github: isLive("github"), jira: isLive("jira") });
@@ -39,6 +39,6 @@ export function publicOrigin(req: Request): string {
 export function githubInfo(): GithubInfo {
   const mode = githubMode();
   if (mode === null) return { mode, label: "GitHub", sees: 'GITHUB_AUTH_MODE is invalid. Set it to "app" or "oauth".' };
-  if (!isLive("github")) return { mode, label: `GitHub (${githubModeInfo[mode].label}, sample data)`, sees: "Sample data. Real GitHub is not configured on this deployment." };
+  if (!isLive("github")) return { mode, label: `GitHub (${githubModeInfo[mode].label})`, sees: "Not configured on this deployment. Ask an admin to add the client credentials and the token encryption key." };
   return { mode, ...githubModeInfo[mode] };
 }

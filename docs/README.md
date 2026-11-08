@@ -19,6 +19,8 @@ For workflow direction, read the [workflow and portal rationale](10-workflow-and
 | [13-broker-workflow-wiring](13-broker-workflow-wiring.md) | App-authenticated dispatch, runner credentials, and OIDC callbacks |
 | [14-agent-workflow-automation-architecture](14-agent-workflow-automation-architecture.md) | IRA access request: each identity's purpose, integration role, permissions, and approval boundaries |
 | [15-channel-invocation-and-portal-access](15-channel-invocation-and-portal-access.md) | Plain explanation of channel invocation, the supplementary portal, and their credential roles |
+| [16-azure-broker-storage-and-dispatch-research](16-azure-broker-storage-and-dispatch-research.md) | Cosmos records, event processing, remote execution, and external dispatcher security |
+| [17-jira-research-invocation](17-jira-research-invocation.md) | Jira `/research` creates a workspace issue; project-to-context routing; repeat handling; board stages |
 
 
 ## HTML artifacts

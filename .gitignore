@@ -6,3 +6,4 @@ node_modules
 
 # Local visual aids for planning and concept discussions.
 /.local-artifacts/
+.DS_Store

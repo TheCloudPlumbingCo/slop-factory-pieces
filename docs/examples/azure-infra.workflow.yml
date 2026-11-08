@@ -1,0 +1,202 @@
+# Copy to .github/workflows/azure-infra.yml after the setup guide is complete.
+name: Azure infrastructure
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Select plan or apply
+        type: choice
+        options: [plan, apply]
+        default: plan
+        required: true
+permissions:
+  contents: read
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.filter.outputs.matrix }}
+      any: ${{ steps.filter.outputs.any }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select changed components
+        id: filter
+        shell: bash
+        run: |
+          python3 - <<'FILTER'
+          import json, os, subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(['git', *args])
+
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          kind = os.environ['GITHUB_EVENT_NAME']
+          if kind == 'workflow_dispatch':
+              paths = {'.github/workflows/azure-infra.yml'}
+          else:
+              if kind == 'pull_request':
+                  base = event['pull_request']['base']['sha']
+                  head = event['pull_request']['head']['sha']
+                  base = git('merge-base', base, head).decode().strip()
+              else:
+                  base, head = event['before'], event['after']
+              if base == '0' * 40:
+                  raw = git('ls-tree', '-r', '--name-only', '-z', head)
+              else:
+                  raw = git('diff', '--no-renames', '--name-only', '-z', base, head)
+              paths = {p.decode() for p in raw.split(b'\0') if p}
+          shared = '.github/workflows/azure-infra.yml' in paths
+          components = [
+              ('broker', 'infra/azure/terraform', 'azure-dev-broker'),
+              ('portal', 'portal/terraform', 'azure-dev-portal'),
+          ]
+          selected = []
+          for component, directory, environment in components:
+              relevant = any(
+                  p.startswith(directory + '/') and
+                  p.endswith(('.tf', '.tf.json', '.tfvars', '.tfvars.json', '.hcl'))
+                  for p in paths
+              )
+              if shared or relevant:
+                  selected.append(dict(component=component, directory=directory,
+                                       environment=environment))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('matrix=' + json.dumps({'include': selected}) + '\n')
+              output.write('any=' + str(bool(selected)).lower() + '\n')
+          print('Selected components:', ', '.join(x['component'] for x in selected) or 'none')
+          FILTER
+
+  validate:
+    needs: changes
+    if: needs.changes.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ matrix.directory }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          # Set this at repository level so pull requests can read it.
+          terraform_version: ${{ vars.TERRAFORM_VERSION }}
+      - name: Check formatting
+        run: terraform fmt -check ./*.tf
+      - name: Initialize providers without state access
+        run: terraform init -backend=false -input=false -lockfile=readonly
+      - name: Validate
+        run: terraform validate
+
+  infrastructure-check:
+    name: Infrastructure check
+    needs: [changes, validate]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          HAS_CHANGES: ${{ needs.changes.outputs.any }}
+          VALIDATE_RESULT: ${{ needs.validate.result }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          if [ "$HAS_CHANGES" = true ]; then
+            test "$VALIDATE_RESULT" = success
+          else
+            test "$VALIDATE_RESULT" = skipped
+          fi
+
+  terraform:
+    needs: [changes, infrastructure-check]
+    if: >-
+      needs.changes.outputs.any == 'true' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    environment: ${{ matrix.environment }}
+    concurrency:
+      group: azure-dev-${{ matrix.component }}
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ matrix.directory }}
+    env:
+      TF_IN_AUTOMATION: 'true'
+      TF_INPUT: 'false'
+      ARM_USE_OIDC: 'true'
+      ARM_USE_AZUREAD: 'true'
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ vars.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+      - name: Check backend declaration
+        run: test -f backend.tf
+      - name: Initialize remote state
+        env:
+          STATE_ACCOUNT: ${{ vars.TF_STATE_ACCOUNT }}
+          STATE_CONTAINER: ${{ vars.TF_STATE_CONTAINER }}
+          STATE_KEY: dev/${{ matrix.component }}.tfstate
+        run: |
+          : "${STATE_ACCOUNT:?Set TF_STATE_ACCOUNT}"
+          : "${STATE_CONTAINER:?Set TF_STATE_CONTAINER}"
+          terraform init -input=false -lockfile=readonly \
+            -backend-config="storage_account_name=$STATE_ACCOUNT" \
+            -backend-config="container_name=$STATE_CONTAINER" \
+            -backend-config="key=$STATE_KEY"
+      - name: Validate
+        run: terraform validate
+      - name: Plan broker
+        if: matrix.component == 'broker'
+        run: terraform plan -input=false -lock-timeout=5m -out=tfplan
+      - name: Plan portal
+        if: matrix.component == 'portal'
+        env:
+          TF_VAR_app_client_id: ${{ vars.PORTAL_APP_CLIENT_ID }}
+          TF_VAR_image: ${{ vars.PORTAL_IMAGE }}
+          TF_VAR_custom_domain: ${{ vars.PORTAL_CUSTOM_DOMAIN }}
+          TF_VAR_custom_domain_dns_ready: ${{ vars.PORTAL_DNS_READY || 'false' }}
+          TF_VAR_github_auth_mode: ${{ vars.PORTAL_GITHUB_AUTH_MODE || 'app' }}
+          TF_VAR_github_client_id: ${{ vars.PORTAL_GITHUB_CLIENT_ID }}
+          TF_VAR_github_client_secret: ${{ secrets.PORTAL_GITHUB_CLIENT_SECRET }}
+          TF_VAR_atlassian_client_id: ${{ vars.PORTAL_ATLASSIAN_CLIENT_ID }}
+          TF_VAR_atlassian_client_secret: ${{ secrets.PORTAL_ATLASSIAN_CLIENT_SECRET }}
+          TF_VAR_atlassian_scopes: ${{ vars.PORTAL_ATLASSIAN_SCOPES }}
+          TF_VAR_token_encryption_key: ${{ secrets.PORTAL_TOKEN_ENCRYPTION_KEY }}
+        run: |
+          : "${TF_VAR_app_client_id:?Set PORTAL_APP_CLIENT_ID}"
+          : "${TF_VAR_image:?Set PORTAL_IMAGE to an existing public image}"
+          terraform plan -input=false -lock-timeout=5m -out=tfplan
+      - name: Apply saved plan
+        if: github.event_name == 'push' || inputs.action == 'apply'
+        run: terraform apply -input=false -lock-timeout=5m tfplan
+      - name: Remove local plan
+        if: always()
+        run: rm -f tfplan

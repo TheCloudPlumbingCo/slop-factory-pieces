@@ -4,7 +4,7 @@
  */
 
 /** A workspace id is the name of a folder under `workspaces/`: lowercase letters, digits and dashes. */
-const workspaceId = /^[a-z0-9][a-z0-9-]*$/
+export const workspaceId = /^[a-z0-9][a-z0-9-]*$/
 
 export type ResearchCommand =
 	| { readonly _tag: 'Research'; readonly workspace: string; readonly notes: string }

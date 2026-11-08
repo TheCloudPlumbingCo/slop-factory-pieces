@@ -1,6 +1,6 @@
 # portal-poc
 
-Next.js 15 prototype portal. Sign-in is Microsoft Entra (Auth.js). GitHub and Jira can be connected per user with real OAuth; research triggering, the pipeline board and workspaces are still simulated.
+Next.js 15 prototype portal. Sign-in is Microsoft Entra (Auth.js). GitHub and Jira can be connected per user with real OAuth; the dashboard shows real GitHub review requests and Start RPI lists real Jira issues. Starting a run from the portal is not wired to the agent yet. There is no sample data.
 
 Design direction: [workflow and portal rationale](../docs/10-workflow-and-portal-rationale.md).
 
@@ -16,12 +16,10 @@ Interaction terminology: [Channel-Based Invocation and Portal Access](../docs/15
 npm install
 cp .env.example .env.local   # fill in the values below
 npm run dev                  # http://localhost:3000
-npm test                     # unit tests (mocked fetch)
+npm test                     # unit tests (fetch is stubbed)
 ```
 
-`PROTOTYPE_NO_AUTH=1 npm run dev` skips sign-in and uses sample data for everything.
-
-A provider is "live" only when `PROTOTYPE_NO_AUTH` is unset, its client id and secret are set, and `TOKEN_ENCRYPTION_KEY` is set. Otherwise that provider's Connect button and pickers fall back to the sample data.
+A provider is "live" only when its client id and secret and `TOKEN_ENCRYPTION_KEY` are set. Otherwise the portal says the provider is not configured and disables Connect. `PORTAL_LOCAL_USER=<name>` skips Microsoft sign-in locally and still uses real GitHub and Jira.
 
 ## Environment variables
 
@@ -31,6 +29,7 @@ A provider is "live" only when `PROTOTYPE_NO_AUTH` is unset, its client id and s
 | `AUTH_URL` | Public origin of the app. Set when deployed; used to build OAuth callback URLs. Locally the request host is used. |
 | `TOKEN_ENCRYPTION_KEY` | AES-256-GCM key for stored provider tokens. 32 bytes, base64. |
 | `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` | GitHub App OAuth credentials. |
+| `NEXT_PUBLIC_PROJECT_URL` | Optional. GitHub project board URL; the dashboard links to it when set. |
 | `ATLASSIAN_CLIENT_ID`, `ATLASSIAN_CLIENT_SECRET` | Atlassian OAuth 2.0 (3LO) credentials. |
 
 Generate the encryption key (keep it out of git; losing it makes stored connections unreadable and users must reconnect):

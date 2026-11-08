@@ -177,6 +177,10 @@ Sources: [GitHub App permissions](https://docs.github.com/en/apps/creating-githu
 
 ## 5. Jira service account identity
 
+Jira Cloud now calls its issue containers spaces. This section retains project terminology for technical permission names.
+
+Approved projects means approved Jira spaces. See the [terminology explanation](15-channel-invocation-and-portal-access.md#7-jira-project-and-jira-space-mean-the-same-container).
+
 ### 5.1 Where we use it
 
 Use the Jira service account for channel-based invocation from Jira issues and comments.
@@ -213,6 +217,12 @@ The broker must check the requester separately and preserve the issue's disclosu
 
 ### 5.4 Jira project permissions requested
 
+Project permissions belong to the service account, through Jira permission schemes or project access settings.
+
+They answer: what may this account do in this specific project?
+
+Ask the Jira administrator to apply the following permissions only to the approved projects.
+
 | Permission | Why needed | Boundary |
 | --- | --- | --- |
 | Browse Projects | Read the issue and relevant context | Approved projects and permitted issue-security levels |
@@ -226,12 +236,18 @@ Issue creation, editing, deletion, and workflow transitions need separate approv
 
 ### 5.5 API-token scopes requested
 
-Project permissions and API-token scopes are separate controls. Both must permit an operation.
+Token scopes belong to the API credential issued for the service account.
+
+They answer: which Jira API operations may this credential request?
+
+Ask the service account administrator to issue a scoped API token with the following classic scopes.
 
 | Scope | Purpose |
 | --- | --- |
 | `read:jira-work` | Read issue context needed for the request |
 | `write:jira-work` | Use the Jira comment-write API |
+
+Scopes do not select project names. Granting a scope does not add project permissions to the account.
 
 The classic write scope covers more API operations than comment creation.
 
@@ -243,7 +259,52 @@ If policy requires narrower token scopes, select the endpoint-specific granular 
 
 The approved scope set must match the issued credential before release.
 
-### 5.6 Approval conditions
+### 5.6 How Jira combines the two settings
+
+```mermaid
+flowchart LR
+  R[API request with service account token] --> S[Does token scope permit the API?]
+  S --> P[Does the account have project permission?]
+  P --> I[Does issue security permit access?]
+  I --> A[Allow operation]
+```
+
+Both scope and project permission must allow the operation. Issue security and other applicable controls can further restrict access.
+
+| Requested operation | Token scope | Project permission | Result at these two permission layers |
+| --- | --- | --- | --- |
+| Read an issue | `read:jira-work` | Browse Projects | Permitted, subject to issue security |
+| Add a reply | `write:jira-work` | Browse Projects and Add Comments | Permitted, subject to issue security |
+| Edit an issue | `write:jira-work` | Edit Issues not granted | Blocked despite the broad write scope |
+| Read another project | `read:jira-work` | Browse Projects not granted there | Blocked despite the read scope |
+
+Check effective permissions across all account groups and roles. A broad membership can add unintended project access.
+
+### 5.7 Exact provisioning request
+
+Use this text in the onboarding request. Replace the project placeholder before submission.
+
+> Create a dedicated Jira service account for the agent broker.
+>
+> Grant Jira product access as required for its approved operation.
+>
+> Limit project access to: `<approved project keys>`.
+>
+> Grant Browse Projects and Add Comments in those projects, with only the required issue-security access.
+>
+> Do not grant issue creation, editing, deletion, transitions, or project/global administration for this use case.
+>
+> Issue a scoped service account API token with `read:jira-work` and `write:jira-work`.
+>
+> Record the account owner, token owner, expiry date, rotation process, and secure backend delivery method.
+>
+> The token will support issue-context reads and bot comments only.
+
+The classic token scope is broader than this operating purpose. The restricted project role is therefore part of the request.
+
+If the token must independently exclude other write APIs, request a granular scope design before issuing the credential.
+
+### 5.8 Approval conditions
 
 - Create a dedicated service account with a named owner.
 - Restrict it to approved sites, projects, and issue-security levels.

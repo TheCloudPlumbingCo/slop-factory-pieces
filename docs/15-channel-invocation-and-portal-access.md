@@ -89,3 +89,26 @@ GitHub supports both roles through one App registration, with different token ty
 Jira uses a service account for bot operations and a 3LO OAuth app for personal portal access.
 
 The [identity and access request](14-agent-workflow-automation-architecture.md) defines the permissions requested for each role.
+
+## 7. Jira project and Jira space mean the same container
+
+Jira Cloud renamed projects to spaces. A Jira space groups related work items, such as bugs and tasks.
+
+The name changed. It does not add another container above or below the old project.
+
+```mermaid
+flowchart TD
+  S[Jira site] --> P[Jira space: formerly project]
+  P --> A[Work item: example PAY-1]
+  P --> B[Work item: example PAY-2]
+```
+
+The example key `PAY` identifies the space. The number identifies an individual work item within it.
+
+Existing APIs retain project terminology. The access request uses project permission names where they identify the technical grant.
+
+For this request, approved Jira projects means the approved Jira spaces containing the issues the bot may read and comment on.
+
+A Confluence space holds documentation pages. An Atlassian Project provides higher-level status updates. Neither is this Jira issue container.
+
+Sources: [Jira terminology change](https://community.atlassian.com/forums/discussion/3085938/more-on-the-move-from-jira-projects-to-spaces), [Jira space definition](https://support.atlassian.com/jira-software-cloud/docs/what-is-a-jira-software-project/).

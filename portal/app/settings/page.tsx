@@ -11,7 +11,7 @@ const connectErrorText = (code: string): string =>
   })[code] ?? `Could not connect (${code}). Click Connect to try again.`;
 
 export default function Settings() {
-  const { jira, github, githubInfo, connect, disconnect, reset } = useStore();
+  const { jira, github, githubInfo, live, connect, disconnect } = useStore();
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
   // The OAuth callback redirects here with ?connected=<provider> or ?error=<code>.
@@ -44,13 +44,13 @@ export default function Settings() {
             <div className="conn" key={p.id}>
               <div>
                 <strong>{p.name}</strong>
-                <div className="muted">{p.state.connected ? `Connected as ${p.state.account}` : p.why}</div>
+                <div className="muted">{p.state.connected ? `Connected as ${p.state.account}` : live[p.id] ? p.why : connectErrorText("not_configured")}</div>
                 {p.state.connected && p.id === "github" && <div className="muted">{p.why}</div>}
               </div>
               {p.state.connected ? (
                 <button className="btn ghost" onClick={() => disconnect(p.id)}>Disconnect {p.name}</button>
               ) : (
-                <button className="btn primary" onClick={() => connect(p.id)}>Connect {p.name}</button>
+                <button className="btn primary" disabled={!live[p.id]} onClick={() => connect(p.id)}>Connect {p.name}</button>
               )}
             </div>
           ))}
@@ -65,11 +65,6 @@ export default function Settings() {
         <div>
           <p className="muted" style={{ margin: 0 }}>Each project has a workspace repo where people create and edit its logical workspaces. A Jira ticket finds its workspace from the project code, so there is nothing to choose or configure in the portal.</p>
         </div>
-      </section>
-
-      <section className="section">
-        <div><h2>Prototype</h2></div>
-        <div><button className="btn ghost" onClick={reset}>Reset sample data</button></div>
       </section>
     </>
   );

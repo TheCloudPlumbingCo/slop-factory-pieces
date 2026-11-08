@@ -14,13 +14,11 @@ export const metadata = { title: "Slop portal" };
 export const dynamic = "force-dynamic";
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // Local only: PROTOTYPE_NO_AUTH=1 (sample data) or PORTAL_LOCAL_USER=<name> (real GitHub and Jira) skip Microsoft sign-in.
+  // Local only: PORTAL_LOCAL_USER=<name> skips Microsoft sign-in and still uses real GitHub and Jira.
   const local = localUser();
-  const session = process.env.PROTOTYPE_NO_AUTH
-    ? { user: { name: "Alice (preview)", email: "poc-alice@devhyashodhagmail.onmicrosoft.com" } }
-    : local
-      ? { user: { name: local, email: "local development, no Microsoft sign-in" } }
-      : await auth();
+  const session = local
+    ? { user: { name: local, email: "local development, no Microsoft sign-in" } }
+    : await auth();
   const fonts = `${display.variable} ${body.variable} ${mono.variable}`;
 
   if (!session) {
