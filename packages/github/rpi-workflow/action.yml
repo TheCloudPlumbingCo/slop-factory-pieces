@@ -14,8 +14,8 @@ inputs:
   issue:
     description: The workspace issue number. The result is posted there.
     required: true
-  task:
-    description: What to research. When empty, the issue title and body are used.
+  instructions:
+    description: Optional extra instructions. They are added to the issue title and body, never instead of them.
     default: ''
   workspace-dir:
     description: Where the workspace repo is checked out.
@@ -84,7 +84,7 @@ runs:
       shell: bash
       env:
         WS: ${{ inputs.workspace }}
-        TASK: ${{ inputs.task }}
+        INSTRUCTIONS: ${{ inputs.instructions }}
         ISSUE: ${{ inputs.issue }}
         COPILOT_GITHUB_TOKEN: ${{ inputs.copilot-token }}
         MODEL: ${{ inputs.model }}

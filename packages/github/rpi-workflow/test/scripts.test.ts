@@ -213,8 +213,9 @@ describe('run-agent.sh', () => {
 			env: {
 				PATH: `${bin}:${process.env.PATH ?? ''}`,
 				WS: 'be',
-				TASK: 'why?',
+				INSTRUCTIONS: 'why?',
 				ISSUE: '42',
+				GITHUB_REPOSITORY: 'acme/ws',
 				COPILOT_GITHUB_TOKEN: 'secret-token',
 				RUNNER_TEMP: tmp,
 				...env,
@@ -274,4 +275,52 @@ describe('resolve-command.sh', () => {
 			expect(result.output).toBe('')
 		})
 	}
+})
+
+describe('build-prompt.sh', () => {
+	/** A fake `gh` that answers `issue view` with a fixed title and body, or fails. */
+	const prompt = (env: Record<string, string>, issue: { title: string; body: string } | 'fail') => {
+		const bin = join(root, 'bin')
+		mkdirSync(bin)
+		const answer = issue === 'fail' ? 'exit 1' : `printf 'Title: %s\\n\\n%s' '${issue.title}' '${issue.body}'`
+		writeFileSync(join(bin, 'gh'), `#!/usr/bin/env bash\n${answer}\n`)
+		chmodSync(join(bin, 'gh'), 0o755)
+		const result = run('build-prompt.sh', [], {
+			cwd: root,
+			env: { PATH: `${bin}:${process.env.PATH ?? ''}`, WS: 'be', ISSUE: '15', GITHUB_REPOSITORY: 'acme/ws', ...env },
+		})
+		return result.stdout
+	}
+	const issue = { title: 'Order hangs', body: 'The order waits when water is slow.' }
+
+	it('uses the issue alone when there are no instructions', () => {
+		const text = prompt({ INSTRUCTIONS: '' }, issue)
+		expect(text).toContain('## Issue #15')
+		expect(text).toContain('Order hangs')
+		expect(text).toContain('The order waits when water is slow.')
+		expect(text).not.toContain('Additional instructions')
+	})
+
+	it('adds the instructions after the issue, never instead of it', () => {
+		const text = prompt({ INSTRUCTIONS: 'Focus on timeouts.' }, issue)
+		expect(text).toContain('Order hangs')
+		expect(text).toContain('## Additional instructions\nFocus on timeouts.')
+		expect(text.indexOf('Order hangs')).toBeLessThan(text.indexOf('Focus on timeouts.'))
+	})
+
+	it('treats whitespace-only instructions as none', () => {
+		expect(prompt({ INSTRUCTIONS: '  \n ' }, issue)).not.toContain('Additional instructions')
+	})
+
+	it('still builds a prompt when the issue cannot be read', () => {
+		const text = prompt({ INSTRUCTIONS: 'Focus on timeouts.' }, 'fail')
+		expect(text).toContain('The issue could not be read.')
+		expect(text).toContain('Focus on timeouts.')
+	})
+
+	it('names the workspace and the read-only rule', () => {
+		const text = prompt({ INSTRUCTIONS: '' }, issue)
+		expect(text).toContain("the 'be' workspace")
+		expect(text).toContain('Do not modify any file.')
+	})
 })
