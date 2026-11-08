@@ -8,12 +8,14 @@ Status: version 0. It runs research in a workspace repo and posts the result on 
 
 One file in the workspace repo, on the default branch:
 
+One file for every phase. The command (research, design, outline, ...) is in the payload, so a new phase needs no new file.
+
 ```yaml
 # .github/workflows/slopfactory.yml
 name: slop factory
 on:
   repository_dispatch:
-    types: [slopcodebot-research]
+    types: [slopfactory-run, slopcodebot-research]   # the second is the old broker event; it means research
 permissions:
   contents: write
   issues: read
@@ -63,6 +65,7 @@ flowchart TD
 
 | Stage | Script | Notes |
 | --- | --- | --- |
+| 0 | `scripts/resolve-command.sh` | Maps the command to a board column. Rejects an unknown command. This is where a new phase is added. |
 | 1 | `scripts/check-workspace.sh` | Fails with a short message when the workspace id or folder is wrong. |
 | 2 | `scripts/move-card.sh` | Optional. Never moves a card backwards. Needs the board token. |
 | 3 | `scripts/clone-repos.sh` | Removes `.git`, so the agent cannot push. |
@@ -77,6 +80,7 @@ The workflow reads these fields from `github.event.client_payload`:
 
 | Field | Use |
 | --- | --- |
+| `command` | What to run. Today only `research`. Missing means `research`. An unknown command gets a comment on the issue. |
 | `workspace` | Workspace id. |
 | `issueNumber` | The workspace issue that gets the result. |
 | `task` | The research task. When empty, the issue title and body are used. |
@@ -93,8 +97,9 @@ The broker also sends `deliveryId` and `brokerOrigin`. This version ignores both
 ## Next
 
 - Replace `scripts/run-agent.sh` with the Copilot SDK runner and the pinned rpi skill.
+- Add the design and outline commands to `scripts/resolve-command.sh`.
 - Add `repo.yml` for the implement command, run in the original repo.
-- Move to one event type, `slopfactory-run`, when the broker changes.
+- Send `slopfactory-run` with a `command` field from the broker, then drop the old event type.
 
 ## Tests
 

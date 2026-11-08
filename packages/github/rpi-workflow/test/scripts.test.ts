@@ -243,3 +243,35 @@ describe('run-agent.sh', () => {
 		expect(readFileSync(join(tmp, 'result.md'), 'utf8')).toContain('COPILOT_GITHUB_TOKEN')
 	})
 })
+
+describe('resolve-command.sh', () => {
+	const resolve = (command: string) => {
+		const tmp = join(root, 'tmp')
+		mkdirSync(tmp)
+		const out = join(root, 'github-output')
+		writeFileSync(out, '')
+		const result = run('resolve-command.sh', [], { cwd: root, env: { COMMAND: command, RUNNER_TEMP: tmp, GITHUB_OUTPUT: out } })
+		const read = (path: string) => (existsSync(path) ? readFileSync(path, 'utf8') : '')
+		return { code: result.status, output: read(out), status: read(join(tmp, 'status')).trim(), message: read(join(tmp, 'result.md')) }
+	}
+
+	it('maps research to the Research column', () => {
+		expect(resolve('research')).toMatchObject({ code: 0, output: 'card-status=Research\n', status: '' })
+	})
+
+	it('says a known phase is not supported yet', () => {
+		const result = resolve('design')
+		expect(result.code).toBe(1)
+		expect(result.status).toBe('fail')
+		expect(result.message).toContain('not supported yet')
+	})
+
+	for (const command of ['', 'frobnicate']) {
+		it(`rejects the unknown command ${JSON.stringify(command)}`, () => {
+			const result = resolve(command)
+			expect(result.code).toBe(1)
+			expect(result.message).toContain('Unknown command')
+			expect(result.output).toBe('')
+		})
+	}
+})

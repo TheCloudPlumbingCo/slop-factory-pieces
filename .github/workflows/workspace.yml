@@ -24,9 +24,9 @@ on:
         description: Token the Copilot CLI signs in with.
         required: true
 
-# One run per issue at a time. A second request waits.
+# One run per issue at a time, whatever the command. A second request waits.
 concurrency:
-  group: slopfactory-workspace-${{ github.event.client_payload.issueNumber }}
+  group: slopfactory-${{ github.event.client_payload.issueNumber }}
   cancel-in-progress: false
 
 permissions:
@@ -84,6 +84,8 @@ jobs:
       # Use @v1 once the tag exists.
       - uses: TheCloudPlumbingCo/slop-factory-pieces/packages/github/rpi-workflow@main
         with:
+          # The old broker event has no command field; it only ever meant research.
+          command: ${{ github.event.client_payload.command || 'research' }}
           workspace: ${{ github.event.client_payload.workspace }}
           issue: ${{ github.event.client_payload.issueNumber }}
           task: ${{ github.event.client_payload.task }}
