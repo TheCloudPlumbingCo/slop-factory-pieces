@@ -32,7 +32,7 @@ The broker saves the event before the callback runs. It saves the output before 
 |---|---|---|---|
 | Cloudflare (`infra/cloudfare`) | Durable Object | Alarm | AgentSession Durable Object |
 | AWS (`infra/aws`) | DynamoDB | SQS nudge and a sweep every minute | Inside the Processor Lambda |
-| Azure (`infra/azure`) | Cosmos DB | Service Bus nudge and a sweep every minute | Inside the Processor. Research commands go to GitHub Actions. |
+| Azure (`infra/azure`) | Cosmos DB | In-memory timer in one Container App. No queue, no sweep. | Inside the app process. Research commands go to GitHub Actions. |
 
 ## Code
 

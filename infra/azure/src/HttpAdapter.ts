@@ -1,4 +1,4 @@
-/** The parts of an Azure Functions `HttpRequest` the Receiver needs; tests pass a plain object. */
+/** The parts of an incoming HTTP request the Receiver needs; `server.ts` fills them from Node's request, tests pass a plain object. */
 export interface HttpRequestLike {
 	readonly url: string
 	readonly method: string
@@ -6,7 +6,7 @@ export interface HttpRequestLike {
 	readonly arrayBuffer: () => Promise<ArrayBuffer>
 }
 
-/** What a Functions HTTP handler returns. */
+/** What the server writes back. */
 export interface HttpResult {
 	readonly status: number
 	readonly headers: Record<string, string>
@@ -25,7 +25,7 @@ export const toWebRequest = async (request: HttpRequestLike): Promise<Request> =
 	})
 }
 
-/** The Functions result for a web `Response`: its status, headers and text body. */
+/** The status, headers and text body of a web `Response`. */
 export const toHttpResult = async (response: Response): Promise<HttpResult> => {
 	const headers: Record<string, string> = {}
 	response.headers.forEach((value, name) => {

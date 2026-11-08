@@ -1,15 +1,13 @@
 /**
- * The handlers of the bot on Azure, as plain effects over web `Request`s and nudge message bodies; `functions/` wires
- * them to Azure Functions triggers.
+ * The handlers of the bot on Azure, as plain effects over web `Request`s; `server.ts` wires them to HTTP routes.
  *
- * - `receiver` (HTTP trigger): the SDK's webhook routes verify and save the event; the store's write nudges the
- *   mailbox.
- * - `processor` (Service Bus trigger, one message at a time): runs the engine for the nudged mailbox only, draining
- *   the in-process echo agent after every pass, for at most `PASS_BUDGET_MS`, then re-nudges the mailbox if it is
- *   still due (see `processNudge`). It fails when the message should be delivered again.
- * - `sweep` (timer trigger, once a minute): nudges every mailbox whose `readyAt` has passed.
+ * - `receiver`: the SDK's webhook routes verify and save the event; the store's write nudges the mailbox.
+ * - `processNudge`: runs the engine for one mailbox only, draining the in-process echo agent after every pass, for
+ *   at most `PASS_BUDGET_MS`, then nudges the mailbox again if more work is due. The in-memory nudger calls it.
  *
- * Everything but the mailbox-scoped processing is built once per cold start by `makeHandlers`; the processing for
+ * There is no queue and no sweep. A nudge is a timer in the app's memory. If the app stops, the timer is lost.
+ *
+ * Everything but the mailbox-scoped processing is built once per start by `makeHandlers`; the processing for
  * one mailbox is built per nudge and discarded.
  */
 import * as NodeCrypto from '@effect/platform-node/NodeCrypto'
@@ -22,12 +20,12 @@ import {
 } from '@humanlayer/channels-delivery'
 import { GitHubApi, GitHubApiLive } from '@humanlayer/channels-github'
 import { AgentSessions, botSettings, DeliveryApi, makeGitHubProvider } from '@slop/core'
-import { Clock, type Config, ConfigProvider, Context, Effect, Exit, Layer, Option, Schema, Scope } from 'effect'
+import { Clock, type Config, ConfigProvider, Context, Effect, Exit, Layer, Option, Scope } from 'effect'
 import { HttpClient, HttpClientRequest, HttpClientResponse, HttpEffect, HttpRouter, type HttpServerRequest } from 'effect/http'
 
 import { makeInProcessAgentSessions } from './InProcessAgent'
-import { makeStorage, sweep } from './MailboxStore'
-import { MailboxTable, type TableUnavailable } from './MailboxTable'
+import { makeStorage } from './MailboxStore'
+import { MailboxTable } from './MailboxTable'
 import { Nudger, nudgeDelay } from './Nudger'
 
 /** The most processing passes one nudge runs, as the Cloudflare mailbox alarm does. */
@@ -40,23 +38,8 @@ export const MAX_PASSES_PER_NUDGE = 20
  */
 export const PASS_BUDGET_MS = 15_000
 
-/**
- * The shortest re-nudge for a mailbox that is still due but whose last pass found no work: it is stuck (a claim or
- * write that keeps failing, which the engine reports as a skipped mailbox). Waiting at least this long stops a
- * delay-0 nudge loop running at Function speed, as the Cloudflare alarm's `max(readyAt, now + rearmAfterMs)` does.
- */
-export const REARM_FLOOR_MS = 5_000
-
 /** Requests from the in-process delivery client never leave the process; this host only fills the URL. */
 const IN_PROCESS_ORIGIN = 'http://in-process.delivery-api'
-
-/** The body of one nudge message, as `ServiceBusNudgerLive` sends it. */
-const NudgeFields = Schema.Struct({ mailboxKey: Schema.NonEmptyString })
-const NudgeMessage = Schema.fromJsonString(NudgeFields)
-
-/** A trigger hands over the body as JSON text, or as an object when it has already parsed it. */
-const decodeNudge = (body: unknown) =>
-	typeof body === 'string' ? Schema.decodeUnknownEffect(NudgeMessage)(body) : Schema.decodeUnknownEffect(NudgeFields)(body)
 
 /** What the handlers are built over; production passes the Azure services, tests pass fakes. */
 export interface HandlerDependencies<E> {
@@ -83,22 +66,15 @@ export interface HandlerDependencies<E> {
 	}
 }
 
-/** The three handlers as effects, over services built once. */
+/** The handlers as effects, over services built once. */
 export interface Handlers {
 	/** Answer one webhook request. Never fails: every outcome is an HTTP response. */
 	readonly receiver: (request: Request) => Effect.Effect<Response>
 	/** Answer a runner's OIDC-authenticated proxy call. Never fails. */
 	readonly researchSession: (request: Request) => Effect.Effect<Response>
 	/**
-	 * Process one nudge message (its JSON text, or the object a trigger already parsed). It fails when the message
-	 * should be delivered again.
-	 */
-	readonly processor: (body: unknown) => Effect.Effect<void, unknown>
-	/** Nudge every mailbox due now and report how many. */
-	readonly sweep: Effect.Effect<{ readonly nudged: number }, TableUnavailable>
-	/**
-	 * Exactly what the Processor runs for one record's mailbox: passes over that mailbox only, then the re-nudge. It
-	 * fails when the record should be delivered again.
+	 * What the nudger runs for one mailbox: passes over that mailbox only, then the re-nudge. It fails when the
+	 * table is unavailable. Nothing retries it: the nudger logs the failure.
 	 */
 	readonly processNudge: (mailboxKey: string) => Effect.Effect<void, unknown>
 }
@@ -175,13 +151,13 @@ export const makeHandlers = <E>(
 			)
 
 		/**
-		 * Nudge the mailbox again if it is still due, so nothing waits for the sweep: a pass that wrote nothing nudged
-		 * nothing, and a nudge capped at 15 minutes arrives before a later `readyAt`.
+		 * Nudge the mailbox again if it is still due. A nudge capped at 15 minutes arrives before a later `readyAt`.
 		 * - `readyAt` null: nothing to do, no nudge.
 		 * - `readyAt` later: nudge then.
 		 * - `readyAt` passed and `workRemains` (the passes stopped at the cap or the budget while still finding work):
 		 *   nudge at once.
-		 * - `readyAt` passed and the last pass found no work: the mailbox is stuck; nudge after `REARM_FLOOR_MS`.
+		 * - `readyAt` passed and the last pass found no work: the mailbox is stuck. No retry timer: the next event
+		 *   for this mailbox wakes it.
 		 */
 		const renudge = Effect.fn('azure.processor.renudge')(function* (mailboxKey: string, workRemains: boolean) {
 			const stored = yield* table.read(mailboxKey)
@@ -189,8 +165,13 @@ export const makeHandlers = <E>(
 			const { readyAt } = stored.value.state.deliveries
 			if (readyAt === null) return
 			const now = yield* Clock.currentTimeMillis
-			const delayMs = readyAt > now ? nudgeDelay(readyAt, now) : workRemains ? 0 : REARM_FLOOR_MS
-			yield* nudger.nudge(mailboxKey, delayMs)
+			if (readyAt <= now && !workRemains) {
+				yield* Effect.logWarning('Mailbox is due but a pass found no work; no retry is scheduled').pipe(
+					Effect.annotateLogs({ mailboxKey }),
+				)
+				return
+			}
+			yield* nudger.nudge(mailboxKey, readyAt > now ? nudgeDelay(readyAt, now) : 0)
 		})
 
 		/**
@@ -223,32 +204,18 @@ export const makeHandlers = <E>(
 		const researchSession = (request: Request) =>
 			Effect.promise(async () => (await proxy?.(request)) ?? new Response('Not found', { status: 404 }))
 
-		const processor = Effect.fn('azure.processor')(function* (body: unknown) {
-			const { mailboxKey } = yield* decodeNudge(body)
-			yield* processNudge(mailboxKey)
-		}, Effect.tapCause((cause) => Effect.logError('Azure processor message failed', cause)))
-
-		const sweepNow = Clock.currentTimeMillis.pipe(
-			Effect.flatMap(sweep),
-			Effect.map((nudged) => ({ nudged })),
-			Effect.provideService(MailboxTable, table),
-			Effect.provideService(Nudger, nudger),
-			Effect.withSpan('azure.sweep'),
-		)
-
-		return { receiver, researchSession, processor, sweep: sweepNow, processNudge } satisfies Handlers
+		return { receiver, researchSession, processNudge } satisfies Handlers
 	})
 
-/** The entry points the Functions triggers call: Promise-returning functions over handlers built on first use. */
+/** The entry points the HTTP server and the nudger call: Promise-returning functions over handlers built on first use. */
 export interface EntryPoints {
 	readonly receiver: (request: Request) => Promise<Response>
 	readonly researchSession: (request: Request) => Promise<Response>
-	readonly processor: (body: unknown) => Promise<void>
-	readonly sweep: () => Promise<{ readonly nudged: number }>
+	readonly processNudge: (mailboxKey: string) => Promise<void>
 }
 
 /**
- * Entry points over `build`, run once per cold start on the first invocation and reused after. A build that fails is
+ * Entry points over `build`, run once on the first call and reused after. A build that fails is
  * not kept: its scope is closed and the next invocation builds again.
  */
 export const entryPoints = <E>(build: Effect.Effect<Handlers, E, Scope.Scope>): EntryPoints => {
@@ -271,7 +238,6 @@ export const entryPoints = <E>(build: Effect.Effect<Handlers, E, Scope.Scope>): 
 	return {
 		receiver: (request) => handlers().then((ready) => Effect.runPromise(ready.receiver(request))),
 		researchSession: (request) => handlers().then((ready) => Effect.runPromise(ready.researchSession(request))),
-		processor: (body) => handlers().then((ready) => Effect.runPromise(ready.processor(body))),
-		sweep: () => handlers().then((ready) => Effect.runPromise(ready.sweep)),
+		processNudge: (mailboxKey) => handlers().then((ready) => Effect.runPromise(ready.processNudge(mailboxKey))),
 	}
 }

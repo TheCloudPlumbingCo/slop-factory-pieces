@@ -186,7 +186,7 @@ A handoff timeout does not prove that agent execution stopped.
 | --- | --- | --- | --- |
 | Cloudflare | DO storage | Mailbox alarm | Atomic state and alarm writes; post-processing alarm repair. |
 | AWS | DynamoDB | Delayed standard SQS nudge | Periodic overdue-mailbox sweep. |
-| Azure | Cosmos DB | Service Bus scheduled nudge | Periodic overdue-mailbox sweep. |
+| Azure | Cosmos DB | In-memory timer in the app | None. A stopped app loses its timers, and the next event for the mailbox wakes it. |
 | Self-hosted SQL | Postgres | Engine polling | Operate and supervise the polling process. |
 
 Each DO supports one scheduled alarm.

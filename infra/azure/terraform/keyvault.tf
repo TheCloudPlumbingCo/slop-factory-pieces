@@ -21,5 +21,5 @@ resource "azurerm_role_assignment" "deployer_manages_secrets" {
 resource "azurerm_role_assignment" "app_reads_secrets" {
   scope                = azurerm_key_vault.main.id
   role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_linux_function_app.main.identity[0].principal_id
+  principal_id         = azurerm_user_assigned_identity.app.principal_id
 }

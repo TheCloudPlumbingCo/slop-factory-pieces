@@ -118,6 +118,8 @@ export const researchAgentSessions = (options: ResearchSessionsOptions): Layer.L
 									...(workspace === undefined ? {} : { workspace }),
 									issueNumber: Number(ref.number),
 									deliveryId: message.deliveryId,
+									// The workflow skips a run it already did for this id, so a repeated hand-off does not run twice.
+									runId: message.deliveryId,
 									brokerOrigin: options.brokerOrigin,
 								},
 							}),

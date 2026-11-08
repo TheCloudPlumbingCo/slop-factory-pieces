@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stage 5. Shows the result. Runs even when an earlier stage failed.
 #   env: WS, ISSUE, WORKSPACE_DIR, PUBLISH_TOKEN (issues: write, pull requests: write on this repo),
-#        DEFAULT_BRANCH, RUNNER_TEMP, GITHUB_REPOSITORY, GITHUB_SERVER_URL, GITHUB_RUN_ID
+#        DEFAULT_BRANCH, RUN_ID (optional), RUNNER_TEMP, GITHUB_REPOSITORY, GITHUB_SERVER_URL, GITHUB_RUN_ID
 # 1. On success, commits the research document on a branch and opens a pull request.
 # 2. Always posts the result, or the failure, as a comment on the workspace issue.
 set -uo pipefail
@@ -47,4 +47,6 @@ fi
 if [ "$(wc -c < "$result")" -gt 60000 ]; then
   head -c 60000 "$result" > "$result.cut"; printf '\n\n(The result was cut. See the run: %s)\n' "$run_url" >> "$result.cut"; mv "$result.cut" "$result"
 fi
+# The marker lets the next run with the same id see that this one is done (see check-repeat.sh).
+if [ -n "${RUN_ID:-}" ]; then printf '\n\n<!-- slopfactory-run:%s -->\n' "$RUN_ID" >> "$result"; fi
 GH_TOKEN="$PUBLISH_TOKEN" gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body-file "$result" | tail -n 1 > "$tmp/comment-url"

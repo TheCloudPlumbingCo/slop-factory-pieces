@@ -1,10 +1,10 @@
 import { Context, type Effect } from 'effect'
 
 /**
- * Wakes processing for one mailbox later, such as by sending a delayed queue message.
+ * Wakes processing for one mailbox later. The Azure broker uses a timer in memory (`InMemoryNudger`).
  *
- * `nudge` never fails: an implementation logs its own failures. A lost nudge is recovered by the
- * periodic sweep of mailboxes whose `readyAt` has passed.
+ * `nudge` never fails: an implementation logs its own failures. A lost nudge is not repaired: the mailbox wakes
+ * again at the next event for it. There is no sweep.
  */
 export class Nudger extends Context.Service<
 	Nudger,
@@ -14,10 +14,9 @@ export class Nudger extends Context.Service<
 >()('slop-code-factory-azure/Nudger') {}
 
 /**
- * The longest delay one nudge can carry (15 minutes, kept from the AWS nudger; Service Bus has no such limit). A mailbox due later is nudged at this cap; that
- * nudge arrives before `readyAt` and finds nothing due, and the once-a-minute sweep wakes the mailbox after `readyAt`
- * has passed (at most about a minute late). The engine's longest wait today is the 10-minute hand-off timeout, so this
- * does not arise in practice.
+ * The longest delay one nudge can carry (15 minutes, kept from the AWS nudger). A mailbox due later is nudged at this
+ * cap; that nudge arrives before `readyAt` and finds nothing due, and nothing wakes the mailbox again. The engine's
+ * longest wait today is the 10-minute hand-off timeout, so this does not arise in practice.
  */
 export const MAX_NUDGE_DELAY_MS = 900_000
 

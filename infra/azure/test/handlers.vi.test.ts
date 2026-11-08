@@ -1,8 +1,7 @@
 /**
  * The handlers over the memory table, the fake queue and a fake GitHub API: the Receiver answers a web request with
- * the SDK's webhook route, the Processor runs one mailbox per nudge message and drains the in-process echo agent, and
- * the sweep re-nudges every due mailbox. Also `ServiceBusNudgerLive`, `envConfigProvider` and the Functions HTTP
- * adapter over fakes.
+ * the SDK's webhook route, and `processNudge` runs one mailbox and drains the in-process echo agent. Also
+ * `envConfigProvider` and the HTTP adapter over fakes.
  */
 import { createHmac } from 'node:crypto'
 
@@ -21,20 +20,18 @@ import { Clock, Config, ConfigProvider, Effect, Exit, Fiber, FiberSet, Layer, Re
 import { TestClock } from 'effect/testing'
 
 import { envConfigProvider } from '../src/Config'
-import { toHttpResult, toWebRequest } from '../src/functions/adapter'
+import { toHttpResult, toWebRequest } from '../src/HttpAdapter'
 import {
 	type HandlerDependencies,
 	type Handlers,
 	entryPoints,
 	makeHandlers,
 	PASS_BUDGET_MS,
-	REARM_FLOOR_MS,
 } from '../src/Handlers'
 import { emptyMailboxState, type MailboxState } from '../src/MailboxState'
 import { MailboxTable, TableUnavailable } from '../src/MailboxTable'
 import { MemoryMailboxTable } from '../src/MemoryMailboxTable'
 import { Nudger } from '../src/Nudger'
-import { ServiceBusNudgerLive } from '../src/ServiceBusNudger'
 import { makeFakeQueue } from './support/fake-queue'
 
 const signingKey = 'handlers-test-key'
@@ -186,7 +183,7 @@ const mentionBody = (input: { readonly eventId: string; readonly number: number;
 	})
 }
 
-/** A POST to the GitHub webhook route, as the Functions host hands it to the Receiver. */
+/** A POST to the GitHub webhook route, as the HTTP server hands it to the Receiver. */
 const webhookEvent = (input: { readonly body: string; readonly headers: Record<string, string> }): Request =>
 	new Request('https://func.example.test/integrations/github/webhook', {
 		method: 'POST',
@@ -206,9 +203,6 @@ const signedMention = (input: { readonly eventId: string; readonly number: numbe
 		},
 	})
 }
-
-/** The body of one nudge message, as `ServiceBusNudgerLive` sends it. */
-const nudgeBody = (mailboxKey: string) => JSON.stringify({ mailboxKey })
 
 const mailboxDueAt = (mailboxKey: string, readyAt: number | null): MailboxState => ({
 	...emptyMailboxState({ mailboxKey, provider: 'github' }),
@@ -296,27 +290,27 @@ describe('receiver', () => {
 	)
 })
 
-describe('processor', () => {
-	it.effect('processor handles a nudge for an idle mailbox and returns no failures', () =>
+describe('processNudge', () => {
+	it.effect('processNudge handles a nudge for an idle mailbox and returns no failures', () =>
 		Effect.gen(function* () {
 			const { handlers, queue } = yield* setup()
-			yield* handlers.processor(nudgeBody('github:issue:no-such-mailbox'))
+			yield* handlers.processNudge('github:issue:no-such-mailbox')
 			expect(yield* queue.pending).toEqual([])
 		}),
 	)
 
-	it.effect('processor re-nudges a mailbox whose readyAt is still in the future after its passes', () =>
+	it.effect('processNudge re-nudges a mailbox whose readyAt is still in the future after its passes', () =>
 		Effect.gen(function* () {
 			yield* TestClock.setTime(1_000_000)
 			const { handlers, table, queue } = yield* setup()
 			/** Due in 20 minutes: past the 15-minute nudge cap, so a capped nudge arrives early and finds nothing due. */
 			yield* table.write({ state: mailboxDueAt('github:issue:7', 1_000_000 + 1_200_000), expectedVersion: null })
-			yield* handlers.processor(nudgeBody('github:issue:7'))
+			yield* handlers.processNudge('github:issue:7')
 			expect(yield* queue.pending).toEqual([{ mailboxKey: 'github:issue:7', deliverAt: 1_000_000 + 900_000 }])
 		}),
 	)
 
-	it.effect('processor re-nudges a stuck mailbox (due, but its pass found no work) after REARM_FLOOR_MS, not at once', () =>
+	it.effect('processNudge does not retry a stuck mailbox (due, but its pass found no work)', () =>
 		Effect.gen(function* () {
 			const { handlers, tableState, queue } = yield* setup()
 			const received = yield* handlers.receiver(signedMention({ eventId: 'stuck-1', number: 60, text: 'hello' }))
@@ -325,14 +319,13 @@ describe('processor', () => {
 			yield* dropDue(queue)
 			/** Every claim write now fails; the engine reports the mailbox as skipped, so the pass ends with no work. */
 			tableState.failWrites = true
-			const now = yield* Clock.currentTimeMillis
-			yield* handlers.processor(nudgeBody(mailboxKey))
-			const pending = yield* queue.pending
-			expect(pending.map((message) => message.deliverAt)).toEqual([now + REARM_FLOOR_MS])
+			yield* handlers.processNudge(mailboxKey)
+			/** No retry timer: the next event for this mailbox wakes it. */
+			expect(yield* queue.pending).toEqual([])
 		}),
 	)
 
-	it.effect('processor stops starting passes after PASS_BUDGET_MS and queues a delay-0 nudge for the work left', () =>
+	it.effect('processNudge stops starting passes after PASS_BUDGET_MS and queues a delay-0 nudge for the work left', () =>
 		Effect.gen(function* () {
 			const slow = yield* makeSlowAgent(PASS_BUDGET_MS + 1_000)
 			const { handlers, queue, comments } = yield* setup({ agentSessions: slow })
@@ -342,7 +335,7 @@ describe('processor', () => {
 			yield* TestClock.adjust(3_000)
 			yield* dropDue(queue)
 			const startedAt = yield* Clock.currentTimeMillis
-			const fiber = yield* handlers.processor(nudgeBody(mailboxKey)).pipe(Effect.forkChild)
+			const fiber = yield* handlers.processNudge(mailboxKey).pipe(Effect.forkChild)
 			yield* runToEnd(fiber, 60_000)
 			const endedAt = yield* Clock.currentTimeMillis
 			expect(endedAt - startedAt).toBeGreaterThanOrEqual(PASS_BUDGET_MS)
@@ -351,44 +344,28 @@ describe('processor', () => {
 			/** The re-nudge is the invocation's last send: at once, since work remains. */
 			expect((yield* queue.pending).at(-1)).toEqual({ mailboxKey, deliverAt: endedAt })
 			yield* dropDue(queue)
-			yield* handlers.processor(nudgeBody(mailboxKey))
+			yield* handlers.processNudge(mailboxKey)
 			expect(yield* comments).toEqual(['slow reply'])
 		}),
 	)
 
-	it.effect('processor does not nudge when the mailbox has nothing pending', () =>
+	it.effect('processNudge does not nudge when the mailbox has nothing pending', () =>
 		Effect.gen(function* () {
 			const { handlers, table, queue } = yield* setup()
 			yield* table.write({ state: mailboxDueAt('github:issue:8', null), expectedVersion: null })
-			yield* handlers.processor(nudgeBody('github:issue:8'))
+			yield* handlers.processNudge('github:issue:8')
 			expect(yield* queue.pending).toEqual([])
 		}),
 	)
 
-	it.effect('processor fails, for Service Bus to deliver again, on a body that is not a nudge', () =>
-		Effect.gen(function* () {
-			const { handlers } = yield* setup()
-			expect(Exit.isFailure(yield* Effect.exit(handlers.processor('not json')))).toBe(true)
-			expect(Exit.isFailure(yield* Effect.exit(handlers.processor({ mailboxKey: '' })))).toBe(true)
-		}),
-	)
-
-	it.effect('processor accepts the nudge as JSON text or as an already parsed object', () =>
-		Effect.gen(function* () {
-			const { handlers } = yield* setup()
-			expect(Exit.isSuccess(yield* Effect.exit(handlers.processor(nudgeBody('github:issue:12'))))).toBe(true)
-			expect(Exit.isSuccess(yield* Effect.exit(handlers.processor({ mailboxKey: 'github:issue:12' })))).toBe(true)
-		}),
-	)
-
-	it.effect('processor fails, for Service Bus to deliver again, when the table is unavailable', () =>
+	it.effect('processNudge fails when the table is unavailable', () =>
 		Effect.gen(function* () {
 			const { handlers } = yield* setup({ table: unavailableTable })
-			expect(Exit.isFailure(yield* Effect.exit(handlers.processor(nudgeBody('github:issue:11'))))).toBe(true)
+			expect(Exit.isFailure(yield* Effect.exit(handlers.processNudge('github:issue:11')))).toBe(true)
 		}),
 	)
 
-	it.effect('processor runs a signed mention through to the echo reply', () =>
+	it.effect('processNudge runs a signed mention through to the echo reply', () =>
 		Effect.gen(function* () {
 			const { handlers, queue, comments } = yield* setup()
 			const received = yield* handlers.receiver(signedMention({ eventId: 'e2e-1', number: 50, text: 'run it' }))
@@ -408,7 +385,7 @@ describe('processor', () => {
 			const invoke = (mailboxKey: string) =>
 				Effect.gen(function* () {
 					const startedAt = yield* Clock.currentTimeMillis
-					const fiber = yield* handlers.processor(nudgeBody(mailboxKey)).pipe(Effect.forkChild)
+					const fiber = yield* handlers.processNudge(mailboxKey).pipe(Effect.forkChild)
 					const exit = yield* runToEnd(fiber, 30_000).pipe(Effect.exit)
 					invocations.push({
 						succeeded: Exit.isSuccess(exit),
@@ -431,82 +408,23 @@ describe('processor', () => {
 	)
 })
 
-describe('sweep', () => {
-	it.effect('sweepHandler nudges each due mailbox and reports the count', () =>
-		Effect.gen(function* () {
-			yield* TestClock.setTime(10_000)
-			const { handlers, table, queue } = yield* setup()
-			yield* table.write({ state: mailboxDueAt('due-long-ago', 0), expectedVersion: null })
-			yield* table.write({ state: mailboxDueAt('due-just-now', 10_000), expectedVersion: null })
-			yield* table.write({ state: mailboxDueAt('due-later', 10_001), expectedVersion: null })
-			yield* table.write({ state: mailboxDueAt('idle', null), expectedVersion: null })
-			expect(yield* handlers.sweep).toEqual({ nudged: 2 })
-			const pending = yield* queue.pending
-			expect(pending.map((message) => message.mailboxKey).sort()).toEqual(['due-just-now', 'due-long-ago'])
-		}),
-	)
-})
-
 describe('entryPoints', () => {
-	it.effect('builds the handlers once per cold start, and again after a build that failed', () =>
+	it.effect('builds the handlers once, and again after a build that failed', () =>
 		Effect.gen(function* () {
 			let builds = 0
+			const processed: Array<string> = []
 			const stub: Handlers = {
 				receiver: () => Effect.succeed(new Response(null, { status: 204 })),
 				researchSession: () => Effect.succeed(new Response(null, { status: 404 })),
-				processor: () => Effect.void,
-				sweep: Effect.succeed({ nudged: 7 }),
-				processNudge: () => Effect.void,
+				processNudge: (mailboxKey) => Effect.sync(() => void processed.push(mailboxKey)),
 			}
 			const points = entryPoints(Effect.suspend(() => (++builds === 1 ? Effect.fail('config down') : Effect.succeed(stub))))
-			const first = yield* Effect.promise(() => points.sweep().then(() => 'ok', () => 'rejected'))
+			const first = yield* Effect.promise(() => points.processNudge('a').then(() => 'ok', () => 'rejected'))
 			expect(first).toBe('rejected')
-			expect(yield* Effect.promise(() => points.sweep())).toEqual({ nudged: 7 })
+			yield* Effect.promise(() => points.processNudge('b'))
+			expect(processed).toEqual(['b'])
 			expect((yield* Effect.promise(() => points.receiver(new Request('https://x.test/'))))?.status).toBe(204)
 			expect(builds).toBe(2)
-		}),
-	)
-})
-
-describe('ServiceBusNudgerLive', () => {
-	const message = (mailboxKey: string) => ({ body: JSON.stringify({ mailboxKey }), contentType: 'application/json' })
-
-	it.effect('sends a delayed nudge as a scheduled message at the due time', () =>
-		Effect.gen(function* () {
-			yield* TestClock.setTime(1_000_000)
-			const scheduled: Array<{ readonly body: string; readonly at: number }> = []
-			const sender = {
-				sendMessages: () => Promise.reject(new Error('should schedule')),
-				scheduleMessages: (sent: { readonly body: string }, at: Date) => Promise.resolve(void scheduled.push({ body: sent.body, at: at.getTime() })),
-			}
-			const nudger = yield* Nudger.pipe(Effect.provide(ServiceBusNudgerLive(sender)))
-			yield* nudger.nudge('github:issue:42', 2_500)
-			expect(scheduled).toEqual([{ body: message('github:issue:42').body, at: 1_002_500 }])
-		}),
-	)
-
-	it.effect('sends a zero-delay nudge at once, with no schedule', () =>
-		Effect.gen(function* () {
-			const sent: Array<unknown> = []
-			const sender = {
-				sendMessages: (item: unknown) => Promise.resolve(void sent.push(item)),
-				scheduleMessages: () => Promise.reject(new Error('should send at once')),
-			}
-			const nudger = yield* Nudger.pipe(Effect.provide(ServiceBusNudgerLive(sender)))
-			yield* nudger.nudge('github:issue:42', 0)
-			expect(sent).toEqual([message('github:issue:42')])
-		}),
-	)
-
-	it.effect('logs and swallows a failed send', () =>
-		Effect.gen(function* () {
-			const sender = {
-				sendMessages: () => Promise.reject(new Error('queue down')),
-				scheduleMessages: () => Promise.reject(new Error('queue down')),
-			}
-			const nudger = yield* Nudger.pipe(Effect.provide(ServiceBusNudgerLive(sender)))
-			yield* nudger.nudge('github:issue:42', 0)
-			yield* nudger.nudge('github:issue:42', 5_000)
 		}),
 	)
 })
@@ -526,7 +444,7 @@ describe('envConfigProvider', () => {
 	)
 })
 
-describe('Functions HTTP adapter', () => {
+describe('HTTP adapter', () => {
 	it.effect('keeps the body bytes and lower-cases header names', () =>
 		Effect.gen(function* () {
 			const body = new TextEncoder().encode('{"text":"ça 🚀"}')
