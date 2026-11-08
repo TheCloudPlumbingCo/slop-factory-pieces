@@ -61,7 +61,8 @@ flowchart TD
     S1 --> S2["2. Move the board card to Research"]
     S2 --> S3["3. Download the repos, read-only"]
     S3 --> S4["4. Run the agent"]
-    S4 --> S5["5. Open a research PR and comment on the issue"]
+    S4 --> S4b["4b. Write a short summary"]
+    S4b --> S5["5. Open a research PR and post a short comment"]
     S5 --> S6["6. Report to the broker"]
 ```
 
@@ -71,11 +72,59 @@ flowchart TD
 | 1 | `scripts/check-workspace.sh` | Fails with a short message when the workspace id or folder is wrong. |
 | 2 | `scripts/move-card.sh` | Optional. Never moves a card backwards. Needs the board token. |
 | 3 | `scripts/clone-repos.sh` | Removes `.git`, so the agent cannot push. |
-| 4 | `scripts/run-agent.sh` | The only file that names the agent. Today: the Copilot CLI. `scripts/build-prompt.sh` builds the prompt. |
-| 5 | `scripts/publish.sh` | Runs even when an earlier stage failed. Posts the result or the failure as a comment. |
+| 4 | `scripts/run-agent.sh` | Decides what to ask. `scripts/agent.sh` is the only file that names the agent. Today: the Copilot CLI. `scripts/build-prompt.sh` builds the prompt. |
+| 4b | `scripts/summarize.sh` | Runs only when the research worked. Asks the agent for a short summary with diagrams. Never fails the job. |
+| 5 | `scripts/publish.sh` | Runs even when an earlier stage failed. Commits the full research file, opens the PR, and posts a short comment. On failure it posts the failure message. |
 | 6 | `scripts/report.sh` | Runs even when an earlier stage failed. Sends `complete` or `fail` to the broker with an identity token. Sends nothing when the payload has no `deliveryId` (a manual dispatch). Never fails the job. |
 
-`scripts/guard-output.sh` withholds agent output that looks like an access token.
+`scripts/guard-output.sh` withholds agent output that looks like an access token. It runs on the research and on the summary.
+
+## What the comment shows
+
+The full research is in a file in the research PR. People read it there and comment on its lines. The issue comment does not repeat it. The comment is short, with diagrams that GitHub renders:
+
+````markdown
+The cache key is stale, so CI restores old files.
+
+- The key is set in `be-api/.github/workflows/ci.yml:12`.
+- It does not include the lock file hash.
+
+```mermaid
+flowchart LR
+  Push --> Restore
+  Restore --> Build
+  Build --> Fail
+```
+
+---
+Research file: https://github.com/acme/ws/blob/be/research/issue-42/workspaces/be/research/issue-42.md
+Research PR: https://github.com/acme/ws/pull/7
+````
+
+The PR description holds the same short text. It keeps the line `Refs #<issue>` and the line "Merging this PR approves it."
+
+`scripts/publish.sh` checks the summary before it posts it:
+
+| Check | If it fails |
+| --- | --- |
+| The summary exists and is not empty | Short fallback |
+| It is 8000 characters or fewer | Short fallback |
+| `guard-output.sh` finds no token | Short fallback |
+| Each `mermaid` fence is closed, starts with a known diagram word, and is one of the first 2 | That diagram is dropped. The text stays. |
+| Any other code fence is closed | The fence is closed for you |
+
+The short fallback is the first heading and the first 10 lines of the research, with the two links. It is never the full text.
+
+If no PR can be opened, the comment holds the full result, cut to fit. The user still gets the answer.
+
+## The summary prompt and the show-me rules
+
+`scripts/summarize.sh` builds the prompt. It holds the rules for the summary, the research (cut to about 90 KB), and the text of the `show-me` skill. The skill text is in `skills/show-me/SKILL.md`.
+
+- The file is a trimmed copy of `show-me` from `humanlayer/skills`, pinned to commit `4d69d20f6e9b57b4fcf0d501ccfb1be961f0f329`. The header of the file names the source and the licence (MIT).
+- The HTML page and the `open` step are removed. A comment cannot show HTML, and the runner has no browser.
+- The copy is in the repo, so the Action does no download at run time. A change in the upstream repo cannot change our output until someone reads it and updates the copy.
+- The text goes into the prompt, not into a skills folder. The Copilot CLI can load skills from `~/.copilot/skills` or `.github/skills`. But it must find the skill and choose it, and that is not certain. The prompt is certain.
 
 ## Payload
 
@@ -97,6 +146,9 @@ The workflow reads these fields from `github.event.client_payload`:
 - `repository_dispatch` runs only from the default branch.
 - The report needs two settings outside this repo. The caller file grants `id-token: write`. The broker setting `OIDC_ALLOWED_WORKFLOW_REF` holds `TheCloudPlumbingCo/slop-factory-pieces/.github/workflows/workspace.yml@refs/heads/main`. Without them the broker refuses the report and the delivery times out. The result is still on the workspace issue.
 - A run that dies or is cancelled sends no report. The broker needs a watchdog for that case.
+- A Mermaid diagram can still fail to render if a label has odd characters. The check only finds broken fences. GitHub then shows the diagram source as an error box. The text around it is fine.
+- The summary is a second agent call. It adds a few seconds and a small cost to each run.
+- The summary says only what the research says. The prompt asks for this. Nothing checks it. Read the file in the PR for the full truth.
 
 ## Next
 
