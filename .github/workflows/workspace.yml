@@ -81,8 +81,8 @@ jobs:
           node-version: 22
 
       # A reusable workflow cannot use a local path for an Action: it would point into the caller's repo.
-      # TEMPORARY: this branch ref is for testing. Change it to @main, then @v1 once the tag exists, before merging.
-      - uses: TheCloudPlumbingCo/slop-factory-pieces/packages/github/rpi-workflow@rpi-workflow-action
+      # Use @v1 once the tag exists.
+      - uses: TheCloudPlumbingCo/slop-factory-pieces/packages/github/rpi-workflow@main
         with:
           workspace: ${{ github.event.client_payload.workspace }}
           issue: ${{ github.event.client_payload.issueNumber }}
