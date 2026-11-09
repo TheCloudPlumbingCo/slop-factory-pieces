@@ -10,6 +10,7 @@ WORKDIR /repo
 COPY package.json bun.lock ./
 COPY packages ./packages
 COPY infra ./infra
+COPY vendor ./vendor
 RUN bun install --frozen-lockfile --ignore-scripts
 RUN cd infra/azure && bun run bundle
 

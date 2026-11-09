@@ -14,7 +14,7 @@
 		"@effect/platform-node": "4.0.0",
 		"@humanlayer/channels-delivery": "0.1.0",
 		"@humanlayer/channels-github": "0.1.0",
-		"@humanlayer/channels-jira": "file:../../infra/cloudfare/vendor/humanlayer-channels-jira-0.0.0-85830e9.tgz",
+		"@humanlayer/channels-jira": "file:../../vendor/humanlayer-channels-jira-0.0.0-85830e9.tgz",
 		"@slop/core": "*",
 		"effect": "4.0.0",
 		"jose": "6.2.14"

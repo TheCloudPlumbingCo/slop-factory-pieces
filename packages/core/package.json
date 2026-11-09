@@ -19,7 +19,7 @@
 	"dependencies": {
 		"@humanlayer/channels-delivery": "0.1.0",
 		"@humanlayer/channels-github": "0.1.0",
-		"@humanlayer/channels-jira": "file:../../infra/cloudfare/vendor/humanlayer-channels-jira-0.0.0-85830e9.tgz",
+		"@humanlayer/channels-jira": "file:../../vendor/humanlayer-channels-jira-0.0.0-85830e9.tgz",
 		"effect": "4.0.0"
 	}
 }
