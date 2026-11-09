@@ -20,8 +20,8 @@ Show how a comment on GitHub or Jira starts a long-running agent, and how the ag
 
 | Part | State |
 |---|---|
-| Cloudflare broker | Built. Tests pass. |
-| AWS control layer | Built. Tests pass. |
+| Cloudflare broker | Moved to branch `aws-cloudflare-implementations`. |
+| AWS control layer | Moved to branch `aws-cloudflare-implementations`. |
 | Azure control layer | Tests pass against fakes. Not deployed. |
 | Portal prototype | Sign-in and account connection work. Other parts are simulated. |
 | Real agent (Pi) | Not built. |

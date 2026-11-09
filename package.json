@@ -19,8 +19,6 @@
   },
   "workspaces": [
     "packages/core",
-    "infra/cloudfare",
-    "infra/aws",
     "infra/azure"
   ],
   "overrides": {
