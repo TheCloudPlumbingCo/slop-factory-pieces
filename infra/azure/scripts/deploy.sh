@@ -34,7 +34,7 @@ for tool in docker terraform az; do
 done
 
 echo "==> Building $IMAGE (linux/amd64, Container Apps does not run arm64 here)"
-docker buildx build --platform linux/amd64 -f infra/azure/Dockerfile --tag "$IMAGE" --push "$ROOT"
+docker buildx build --platform linux/amd64 -f "$ROOT/infra/azure/Dockerfile" --tag "$IMAGE" --push "$ROOT"
 
 echo "==> Checking the image can be pulled anonymously (Container Apps pulls it with no credentials)"
 repo_path="${IMAGE_REPO#ghcr.io/}"
