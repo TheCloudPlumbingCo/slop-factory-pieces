@@ -101,6 +101,8 @@ export const researchAgentSessions = (options: ResearchSessionsOptions): Layer.L
 								deliveryId: message.deliveryId,
 								repositoryId: String(ref.repositoryId),
 								installationId: String(ref.installationId),
+								owner: ref.owner,
+								repository: ref.repository,
 								accessToken: Redacted.value(message.accessToken),
 								expiresAt: Date.now() + PENDING_TTL_SECONDS * 1000,
 							}),

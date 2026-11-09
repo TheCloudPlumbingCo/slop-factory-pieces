@@ -684,3 +684,89 @@ case "$*" in *audience=*) echo '{"value":"jwt-123"}';; *) printf '${http}';; esa
 		expect(r.stdout).toContain('HTTP 401')
 	})
 })
+
+describe('get-tokens.sh', () => {
+	let dir: string
+	beforeEach(() => {
+		dir = mkdtempSync(join(tmpdir(), 'get-tokens-'))
+	})
+
+	/** A fake `curl`: an identity request gets a jwt; a token request gets a token named for its kind, or fails. */
+	const setup = (failKind?: string) => {
+		const bin = join(dir, 'bin')
+		mkdirSync(bin)
+		const log = join(dir, 'curl.log')
+		writeFileSync(
+			join(bin, 'curl'),
+			`#!/usr/bin/env bash
+echo "CALL $*" >> "${log}"
+case "$*" in
+  *audience=*) echo '{"value":"jwt-123"}' ;;
+  *token/${failKind ?? 'never'}*) exit 22 ;;
+  *token/read*) echo '{"token":"ghs_read"}' ;;
+  *token/publish*) echo '{"token":"ghs_publish"}' ;;
+esac
+`,
+		)
+		chmodSync(join(bin, 'curl'), 0o755)
+		const output = join(dir, 'output')
+		writeFileSync(output, '')
+		return { bin, log, output }
+	}
+
+	const getTokens = (s: ReturnType<typeof setup>, env: Record<string, string> = {}) =>
+		run('get-tokens.sh', [], {
+			cwd: dir,
+			env: {
+				PATH: `${s.bin}:${process.env.PATH ?? ''}`,
+				GITHUB_OUTPUT: s.output,
+				BROKER_ORIGIN: 'https://broker.example.net',
+				DELIVERY_ID: 'd-1',
+				ACTIONS_ID_TOKEN_REQUEST_URL: 'https://token.example/req?x=1',
+				ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'req-token',
+				...env,
+			},
+		})
+
+	it('asks the broker for both tokens with an identity token and writes them as outputs', () => {
+		const s = setup()
+		const r = getTokens(s)
+		expect(r.status, r.stderr).toBe(0)
+		expect(readFileSync(s.output, 'utf8')).toBe('read=ghs_read\npublish=ghs_publish\n')
+		const calls = readFileSync(s.log, 'utf8')
+		expect(calls).toContain('https://broker.example.net/research-session/d-1/token/read')
+		expect(calls).toContain('https://broker.example.net/research-session/d-1/token/publish')
+		expect(calls).toContain('audience=https://broker.example.net')
+		expect(r.stdout).toContain('::add-mask::ghs_read')
+	})
+
+	it('uses a token given to it and does not ask the broker for that kind', () => {
+		const s = setup()
+		const r = getTokens(s, { READ_TOKEN: 'given-read' })
+		expect(r.status, r.stderr).toBe(0)
+		expect(readFileSync(s.output, 'utf8')).toBe('read=given-read\npublish=ghs_publish\n')
+		expect(readFileSync(s.log, 'utf8')).not.toContain('token/read')
+	})
+
+	it('fails when the broker does not give a token', () => {
+		const s = setup('publish')
+		const r = getTokens(s)
+		expect(r.status).toBe(1)
+		expect(r.stdout).toContain('did not give the publish token')
+	})
+
+	it('fails on a manual dispatch with no broker delivery and no tokens', () => {
+		const s = setup()
+		const r = getTokens(s, { BROKER_ORIGIN: '', DELIVERY_ID: '' })
+		expect(r.status).toBe(1)
+		expect(r.stdout).toContain('No broker delivery')
+		expect(existsSync(s.log)).toBe(false)
+	})
+
+	it('fails when the job has no identity token', () => {
+		const s = setup()
+		const r = getTokens(s, { ACTIONS_ID_TOKEN_REQUEST_URL: '', ACTIONS_ID_TOKEN_REQUEST_TOKEN: '' })
+		expect(r.status).toBe(1)
+		expect(r.stdout).toContain("id-token: write")
+	})
+})

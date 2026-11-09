@@ -54,19 +54,28 @@ export const installationToken = async (
 	installationId: number,
 	options: {
 		readonly permissions?: Readonly<Record<string, string>>
+		/** Repository names (not owner/name) the token may reach. Without it the token reaches every repo of the installation. */
+		readonly repositories?: ReadonlyArray<string>
 		readonly fetchImpl?: typeof fetch
 		readonly nowMs?: number
 	} = {},
 ): Promise<InstallationToken> => {
 	const fetchImpl = options.fetchImpl ?? fetch
 	const origin = credentials.apiOrigin ?? 'https://api.github.com'
-	const narrowed = options.permissions !== undefined
+	const narrowed = options.permissions !== undefined || options.repositories !== undefined
 	const tokenResponse = await fetchImpl(`${origin}/app/installations/${installationId}/access_tokens`, {
 		method: 'POST',
 		headers: narrowed
 			? { ...githubHeaders(appJwt(credentials, options.nowMs ?? Date.now())), 'content-type': 'application/json' }
 			: githubHeaders(appJwt(credentials, options.nowMs ?? Date.now())),
-		...(narrowed ? { body: JSON.stringify({ permissions: options.permissions }) } : {}),
+		...(narrowed
+			? {
+					body: JSON.stringify({
+						...(options.permissions === undefined ? {} : { permissions: options.permissions }),
+						...(options.repositories === undefined ? {} : { repositories: options.repositories }),
+					}),
+				}
+			: {}),
 	})
 	if (!tokenResponse.ok) {
 		throw new Error(`GitHub installation token request failed: ${tokenResponse.status} ${await tokenResponse.text()}`)

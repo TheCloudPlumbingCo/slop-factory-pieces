@@ -7,6 +7,7 @@ import { envConfigProvider } from './Config'
 import { fromCosmosContainer } from './CosmosContainer'
 import { CosmosMailboxTableLive } from './CosmosMailboxTable'
 import { dispatchRepositoryEvent } from './GithubDispatch'
+import { makeWorkflowTokenMinter } from './WorkflowTokens'
 import { GithubCardMoverLive } from './GithubProjects'
 import { makeHandlers } from './Handlers'
 import { makeInMemoryNudger } from './InMemoryNudger'
@@ -64,6 +65,7 @@ export const productionHandlers = Effect.gen(function* () {
 				allowedWorkflowRefs,
 				forward,
 				skillsJson: process.env.SKILLS_JSON,
+				mintToken: makeWorkflowTokenMinter({ appId, privateKey: Redacted.value(privateKey) }),
 				warn: (reason) => console.warn(`research-session refused: ${reason}`),
 			}),
 		table: CosmosMailboxTableLive(items),

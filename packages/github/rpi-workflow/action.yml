@@ -30,11 +30,11 @@ inputs:
     description: Token the Copilot CLI uses to sign in.
     required: true
   read-token:
-    description: Token with contents read on the workspace's repos.
-    required: true
+    description: Optional. Token with contents read on the workspace's repos. Without it, the broker makes one.
+    default: ''
   publish-token:
-    description: Token with issues write and pull requests write on the workspace repo.
-    required: true
+    description: Optional. Token with issues write and pull requests write on the workspace repo. Without it, the broker makes one.
+    default: ''
   broker-origin:
     description: The broker's https origin from the dispatch payload. Optional. With delivery-id it sends the final report.
     default: ''
@@ -59,6 +59,18 @@ runs:
         GH_TOKEN: ${{ github.token }}
       run: bash "${{ github.action_path }}/scripts/check-repeat.sh"
 
+    # The broker makes both tokens after it checks this run's identity. The App private key stays with the broker.
+    - name: Get the tokens from the broker
+      id: tokens
+      if: steps.repeat.outputs.skip != 'true'
+      shell: bash
+      env:
+        BROKER_ORIGIN: ${{ inputs.broker-origin }}
+        DELIVERY_ID: ${{ inputs.delivery-id }}
+        READ_TOKEN: ${{ inputs.read-token }}
+        PUBLISH_TOKEN: ${{ inputs.publish-token }}
+      run: bash "${{ github.action_path }}/scripts/get-tokens.sh"
+
     - name: Resolve the command
       id: command
       if: steps.repeat.outputs.skip != 'true'
@@ -81,7 +93,7 @@ runs:
       env:
         WS: ${{ inputs.workspace }}
         WORKSPACE_DIR: ${{ inputs.workspace-dir }}
-        READ_TOKEN: ${{ inputs.read-token }}
+        READ_TOKEN: ${{ steps.tokens.outputs.read }}
       run: bash "${{ github.action_path }}/scripts/clone-repos.sh"
 
     - name: Run the agent
@@ -115,7 +127,7 @@ runs:
         ISSUE: ${{ inputs.issue }}
         WORKSPACE_DIR: ${{ inputs.workspace-dir }}
         DEFAULT_BRANCH: ${{ inputs.default-branch }}
-        PUBLISH_TOKEN: ${{ inputs.publish-token }}
+        PUBLISH_TOKEN: ${{ steps.tokens.outputs.publish }}
         RUN_ID: ${{ inputs.run-id }}
       run: bash "${{ github.action_path }}/scripts/publish.sh"
 
