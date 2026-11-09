@@ -81,6 +81,17 @@ describe('makeServer', () => {
 		expect((await fetch(`${base}/research-session/d-1`, { method: 'POST' })).status).toBe(404)
 	})
 
+	it('sends /research-session/{id}/token/{read|publish} to the research proxy', async () => {
+		const { base, seen } = await start()
+		for (const kind of ['read', 'publish']) {
+			const response = await fetch(`${base}/research-session/delivery:v1:a:b/token/${kind}`, { method: 'POST' })
+			expect(response.status).toBe(200)
+		}
+		expect(seen.map(({ route }) => route)).toEqual(['research', 'research'])
+		expect((await fetch(`${base}/research-session/d-1/token/admin`, { method: 'POST' })).status).toBe(404)
+		expect((await fetch(`${base}/research-session/d-1/token/read/extra`, { method: 'POST' })).status).toBe(404)
+	})
+
 	it('builds an https URL when the proxy sets x-forwarded-proto', async () => {
 		const { base, seen } = await start()
 		await fetch(`${base}/research-session/d-1/fail`, { method: 'POST', headers: { 'x-forwarded-proto': 'https' } })

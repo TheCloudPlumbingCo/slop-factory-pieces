@@ -66,7 +66,7 @@ const pick = (routes: ServerRoutes, method: string, pathname: string): Route | u
 	if (pathname === '/deliveries' || pathname.startsWith('/deliveries/')) {
 		return ['GET', 'POST', 'PUT', 'DELETE'].includes(method) ? routes.receiver : undefined
 	}
-	if (/^\/research-session\/[^/]+\/[^/]+\/?$/.test(pathname)) {
+	if (/^\/research-session\/[^/]+\/(?:[^/]+|token\/(?:read|publish))\/?$/.test(pathname)) {
 		return ['GET', 'PUT', 'POST'].includes(method) ? routes.researchSession : undefined
 	}
 	if (pathname === '/skills') {
