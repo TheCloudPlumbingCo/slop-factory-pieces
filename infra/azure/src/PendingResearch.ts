@@ -12,6 +12,9 @@ export interface PendingResearch {
 	/** The numeric GitHub repository id, as a string; the OIDC `repository_id` claim must equal it. */
 	readonly repositoryId: string
 	readonly installationId: string
+	/** The repository the workflow runs in; the publish token is limited to it. */
+	readonly owner: string
+	readonly repository: string
 	readonly accessToken: string
 	/** Epoch ms; checked on read because Cosmos removes expired items lazily. */
 	readonly expiresAt: number
@@ -54,8 +57,9 @@ export const makeCosmosPendingResearch = (items: CosmosItems): PendingResearchSt
 	peek: async (deliveryId, nowMs) => {
 		const found = await items.read(itemId(deliveryId), PENDING_PARTITION)
 		if (found === undefined) return undefined
-		const { deliveryId: id, repositoryId, installationId, accessToken, expiresAt } = found.resource as unknown as PendingResearch
-		return expiresAt > nowMs ? { deliveryId: id, repositoryId, installationId, accessToken, expiresAt } : undefined
+		const { deliveryId: id, repositoryId, installationId, owner, repository, accessToken, expiresAt } =
+			found.resource as unknown as PendingResearch
+		return expiresAt > nowMs ? { deliveryId: id, repositoryId, installationId, owner, repository, accessToken, expiresAt } : undefined
 	},
 	// An etag-guarded delete: of two racing exchanges only one wins.
 	take: async (deliveryId) => {

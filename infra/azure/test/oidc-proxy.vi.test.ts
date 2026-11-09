@@ -36,7 +36,7 @@ const token = (options: TokenOptions = {}) =>
 		.setExpirationTime(options.expiresIn ?? '5m')
 		.sign(privateKey)
 
-const pendingRecord = { deliveryId: DELIVERY, repositoryId: '8', installationId: '7', accessToken: 'task-password' }
+const pendingRecord = { deliveryId: DELIVERY, repositoryId: '8', installationId: '7', owner: 'acme', repository: 'web', accessToken: 'task-password' }
 
 /** A fake router standing for the delivery API: it accepts only the task password and echoes what it was sent. */
 const makeRouter = (status = 200) => {
@@ -247,5 +247,87 @@ describe('cosmos pending store', () => {
 		const store = makeCosmosPendingResearch(makeFakeCosmos())
 		await store.save({ ...pendingRecord, expiresAt: Date.now() + 60_000 })
 		expect((await Promise.all([store.take(DELIVERY), store.take(DELIVERY)])).sort()).toEqual([false, true])
+	})
+})
+
+describe('oidcProxy workflow tokens', () => {
+	const setupMinting = async (mint?: (kind: string, pending: unknown) => Promise<{ token: string }>) => {
+		const store = makeMemoryPendingResearch()
+		await store.save({ ...pendingRecord, expiresAt: Date.now() + 60_000 })
+		const asked: Array<{ kind: string; pending: unknown }> = []
+		const proxy = oidcProxy({
+			verify,
+			store,
+			forward: makeRouter().forward,
+			allowedWorkflowRefs: [WORKFLOW],
+			mintToken: async (kind, pending) => {
+				asked.push({ kind, pending })
+				return (mint ?? (async () => ({ token: 'ghs_minted' })))(kind, pending)
+			},
+		})
+		return { proxy, asked, store }
+	}
+
+	it.each(['read', 'publish'])('issues the %s token to a verified run and keeps the record', async (kind) => {
+		const { proxy, asked, store } = await setupMinting()
+		const response = await proxy(call(`token/${kind}`, await token()))
+		expect(response.status).toBe(200)
+		expect(await response.json()).toEqual({ token: 'ghs_minted' })
+		expect(asked.map((a) => a.kind)).toEqual([kind])
+		expect(await store.peek(DELIVERY, Date.now())).toBeDefined()
+	})
+
+	it('hands the stored installation and repository to the minter', async () => {
+		const { proxy, asked } = await setupMinting()
+		await proxy(call('token/publish', await token()))
+		expect(asked[0]!.pending).toMatchObject({ installationId: '7', owner: 'acme', repository: 'web' })
+	})
+
+	it('refuses a run with the wrong repository_id and mints nothing', async () => {
+		const { proxy, asked } = await setupMinting()
+		await expectRefused(await proxy(call('token/read', await token({ claims: { repository_id: '9' } }))))
+		expect(asked).toEqual([])
+	})
+
+	it('refuses a run from a workflow that is not allowed and mints nothing', async () => {
+		const { proxy, asked } = await setupMinting()
+		const jwt = await token({ claims: { job_workflow_ref: 'acme/web/.github/workflows/other.yml@refs/heads/main' } })
+		await expectRefused(await proxy(call('token/publish', jwt)))
+		expect(asked).toEqual([])
+	})
+
+	it('refuses an unknown delivery id', async () => {
+		const { proxy, asked } = await setupMinting()
+		await expectRefused(await proxy(call('token/read', await token(), { id: 'delivery:v1:nope' })))
+		expect(asked).toEqual([])
+	})
+
+	it('answers 404 for an unknown kind, a GET, or when no minter is set', async () => {
+		const { proxy } = await setupMinting()
+		const jwt = await token()
+		expect((await proxy(call('token/admin', jwt))).status).toBe(404)
+		expect((await proxy(call('token/read', jwt, { method: 'GET' }))).status).toBe(404)
+		const { proxy: plain } = await setup()
+		expect((await plain(call('token/read', jwt))).status).toBe(404)
+	})
+
+	it('answers 502 without GitHub text when the minter fails, and logs a reason without a token', async () => {
+		const store = makeMemoryPendingResearch()
+		await store.save({ ...pendingRecord, expiresAt: Date.now() + 60_000 })
+		const warnings: Array<string> = []
+		const proxy = oidcProxy({
+			verify,
+			store,
+			forward: makeRouter().forward,
+			allowedWorkflowRefs: [WORKFLOW],
+			mintToken: async () => {
+				throw new Error('GitHub installation token request failed: 422 permissions not granted')
+			},
+			warn: (reason) => void warnings.push(reason),
+		})
+		const response = await proxy(call('token/publish', await token()))
+		expect(response.status).toBe(502)
+		expect(await response.text()).toBe('Token not issued')
+		expect(warnings[0]).toContain('422')
 	})
 })

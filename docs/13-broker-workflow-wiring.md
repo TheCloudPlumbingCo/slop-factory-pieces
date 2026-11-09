@@ -31,6 +31,30 @@ flowchart LR
 6. It requests an installation access token from GitHub.
 7. It posts the dispatch event to the repo from the issue or PR reference.
 
+### How the workflow gets its GitHub tokens
+
+The workflow does not hold the App private key. The key stays in the broker's Key Vault.
+
+1. The job asks GitHub for an OIDC token. The audience is the broker origin.
+2. The job calls `POST /research-session/{deliveryId}/token/read` and `.../token/publish`.
+3. The broker checks the OIDC token: `repository_id` and `job_workflow_ref`, as for `complete`.
+4. The broker mints an installation token. Read: `contents: read`. Publish: `pull_requests` and `issues` write, for the one repo.
+5. The job uses the tokens. They expire in about one hour.
+
+```mermaid
+sequenceDiagram
+    participant J as Workflow job
+    participant B as Broker
+    participant G as GitHub API
+    J->>B: POST token/publish (OIDC token)
+    B->>B: check repository_id and workflow ref
+    B->>G: App JWT, then access_tokens (narrow, one repo)
+    G-->>B: installation token
+    B-->>J: token
+```
+
+The job must ask within 15 minutes of the dispatch, while the pending record lives.
+
 The code dispatches to the originating repo. It does not currently look up a central workflow repo for arbitrary channel requests.
 
 The Azure research handler requires a GitHub discussion reference. Jira user OAuth is not part of this dispatch path.
@@ -113,9 +137,8 @@ The workflow declares Contents write, Pull requests write, and `id-token: write`
 
 Those YAML permissions do not grant the broker permission to dispatch. They configure access for the workflow execution.
 
-The checked repo variable `APP_ID` is `5367720`, matching the broker's `SlopCodeDev` App.
 
-Secret names `APP_PRIVATE_KEY` and `COPILOT_GITHUB_TOKEN` exist in the workspace repo.
+The workspace repo needs the secret `COPILOT_GITHUB_TOKEN`. It holds no App private key. The broker makes the workflow's GitHub tokens.
 
 Only their names were inspected. Their values and credential validity were not inspected.
 

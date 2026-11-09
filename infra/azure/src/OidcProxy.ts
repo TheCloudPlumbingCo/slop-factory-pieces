@@ -2,6 +2,7 @@ import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } 
 
 import type { PendingResearchStore } from './PendingResearch'
 import { skillsListResponse } from './Skills'
+import type { MintWorkflowToken, WorkflowTokenKind } from './WorkflowTokens'
 
 export const GITHUB_OIDC_ISSUER = 'https://token.actions.githubusercontent.com'
 const GITHUB_JWKS_URL = `${GITHUB_OIDC_ISSUER}/.well-known/jwks`
@@ -32,6 +33,8 @@ export interface OidcProxyOptions {
 	readonly forward: (request: Request) => Promise<Response>
 	/** `SKILLS_JSON`; `undefined` serves the default skills. */
 	readonly skillsJson?: string | undefined
+	/** Makes the GitHub tokens a workflow asks for at `token/read` and `token/publish`. Without it those routes answer 404. */
+	readonly mintToken?: MintWorkflowToken
 	readonly now?: () => number
 	/** Where the reason for a refusal goes; never a token. */
 	readonly warn?: (reason: string) => void
@@ -55,11 +58,20 @@ const ACTIONS = {
 } as const
 type Action = keyof typeof ACTIONS
 
-const parsePath = (url: string): { deliveryId: string; action: Action } | undefined => {
-	const match = /^\/research-session\/([^/]+)\/(activity|skills|complete|fail)\/?$/.exec(new URL(url).pathname)
-	if (match === null) return undefined
+type Route =
+	| { readonly deliveryId: string; readonly action: Action }
+	| { readonly deliveryId: string; readonly action: 'token'; readonly kind: WorkflowTokenKind }
+
+const parsePath = (url: string): Route | undefined => {
+	const pathname = new URL(url).pathname
+	const tokenMatch = /^\/research-session\/([^/]+)\/token\/(read|publish)\/?$/.exec(pathname)
+	const match = /^\/research-session\/([^/]+)\/(activity|skills|complete|fail)\/?$/.exec(pathname)
+	if (tokenMatch === null && match === null) return undefined
 	try {
-		return { deliveryId: decodeURIComponent(match[1]!), action: match[2] as Action }
+		if (tokenMatch !== null) {
+			return { deliveryId: decodeURIComponent(tokenMatch[1]!), action: 'token', kind: tokenMatch[2] as WorkflowTokenKind }
+		}
+		return { deliveryId: decodeURIComponent(match![1]!), action: match![2] as Action }
 	} catch {
 		return undefined
 	}
@@ -78,10 +90,11 @@ export const oidcProxy =
 		const now = options.now ?? Date.now
 		const refuse = (reason: string) => (warn(reason), unauthorized())
 		const route = parsePath(request.url)
-		if (route === undefined || request.method !== ACTIONS[route.action].method) {
+		if (route === undefined) return new Response('Not found', { status: 404 })
+		if (route.action === 'token' ? request.method !== 'POST' || options.mintToken === undefined : request.method !== ACTIONS[route.action].method) {
 			return new Response('Not found', { status: 404 })
 		}
-		const { deliveryId, action } = route
+		const { deliveryId } = route
 		const header = request.headers.get('authorization')
 		const jwt = header !== null && /^Bearer\s+\S+$/i.test(header) ? header.split(/\s+/)[1]! : undefined
 		if (jwt === undefined) return refuse('missing bearer token')
@@ -108,6 +121,18 @@ export const oidcProxy =
 			return refuse('job_workflow_ref not allowed')
 		}
 
+		if (route.action === 'token') {
+			// The record stays: the workflow asks for both tokens, and `complete` or `fail` ends it.
+			try {
+				const { token } = await options.mintToken!(route.kind, pending)
+				return new Response(JSON.stringify({ token }), { status: 200, headers: { 'content-type': 'application/json' } })
+			} catch (error) {
+				// GitHub's message can name a permission; it never holds a token.
+				warn(`token not issued: ${error instanceof Error ? error.message : 'unknown'}`)
+				return new Response('Token not issued', { status: 502 })
+			}
+		}
+		const { action } = route
 		if (action === 'skills') return skillsListResponse(options.skillsJson)
 
 		const target = new URL(`/deliveries/${encodeURIComponent(deliveryId)}/${action}`, request.url)

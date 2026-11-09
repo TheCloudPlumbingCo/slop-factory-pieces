@@ -36,8 +36,6 @@ The organization also needs:
 
 | Item | Where | Why |
 | --- | --- | --- |
-| `APP_ID` | repository or organization variable | The slop factory GitHub App ID. |
-| `APP_PRIVATE_KEY` | secret | The App private key. The workflow mints short-lived tokens from it. |
 | `COPILOT_GITHUB_TOKEN` | secret | The Copilot CLI signs in with it. |
 | `workspaces/<id>/workspace.json` | workspace repo | Lists the repos and the project number. The broker reads the project number to move the card. |
 

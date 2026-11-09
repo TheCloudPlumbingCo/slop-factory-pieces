@@ -102,4 +102,10 @@ describe('installationToken', () => {
 		const { fetchImpl } = fakeFetch([new Response('permissions not granted', { status: 422 })])
 		await expect(installationToken(credentials, 7, { permissions: { organization_projects: 'write' }, fetchImpl })).rejects.toThrow(/422/)
 	})
+
+	it('limits the token to the repositories asked for', async () => {
+		const { calls, fetchImpl } = fakeFetch([new Response(JSON.stringify({ token: 'one-repo' }), { status: 201 })])
+		await installationToken(credentials, 7, { permissions: { contents: 'write' }, repositories: ['web'], fetchImpl })
+		expect(JSON.parse(calls[0]!.init.body as string)).toEqual({ permissions: { contents: 'write' }, repositories: ['web'] })
+	})
 })
