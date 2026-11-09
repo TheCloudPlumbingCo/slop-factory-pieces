@@ -1,4 +1,0 @@
-dist/
-.terraform/
-*.tfstate*
-*.tfplan

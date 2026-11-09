@@ -18,8 +18,8 @@ flowchart LR
 
 | Part | State |
 |---|---|
-| Cloudflare broker | Built. Tests pass. |
-| AWS control layer | Built. Tests pass. |
+| Cloudflare broker | Moved to branch `aws-cloudflare-implementations`. |
+| AWS control layer | Moved to branch `aws-cloudflare-implementations`. |
 | Azure control layer | Built. Tests pass against fakes. Not deployed. |
 | Portal prototype | Built. Some parts are simulated. |
 | Real agent (Pi) | Not built. |
@@ -29,8 +29,6 @@ flowchart LR
 | Path | Contents |
 |---|---|
 | `packages/core` | Shared bot logic. No cloud imports. |
-| `infra/cloudfare` | Cloudflare broker. The folder name keeps its original spelling. |
-| `infra/aws` | AWS control layer (Terraform). |
 | `infra/azure` | Azure control layer (Terraform). |
 | `channels/github-app` | GitHub App setup. |
 | `agents/pi` | Placeholder for the real agent. |
